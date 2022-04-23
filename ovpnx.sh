@@ -91,12 +91,16 @@ system_check() {
 	fi
 
 	if [[ "$os" == "ubuntu" ]]; then
-		cp /etc/apt/sources.list /etc/apt/sources.list.d/tmp.list
-		sed -i 's/archive.ubuntu.com/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/tmp.list
-		sed -i 's/security.ubuntu.com/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/tmp.list
-		echo "临时更换Ubuntu apt源为中科大镜像站，正在apt update"
-		apt update >/dev/null 2>&1
-		check_command
+		if cat /etc/apt/sources.list |grep -vE "#" |grep -E "ustc.edu|aliyun|tuna.tsinghua|163" ;then
+			echo "apt源已经是国内源，无需设置"
+		else
+			cp /etc/apt/sources.list /etc/apt/sources.list.d/tmp.list
+			sed -i 's/archive.ubuntu.com/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/tmp.list
+			sed -i 's/security.ubuntu.com/mirrors.ustc.edu.cn/g' /etc/apt/sources.list.d/tmp.list
+			echo "临时更换Ubuntu apt源为中科大镜像站，正在apt update"
+			apt update >/dev/null 2>&1
+			check_command
+		fi
 	fi
 
 	if [[ "$os" == "debian" && "$os_version" -lt 9 ]]; then
@@ -479,11 +483,9 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 		[[ -z "$ip_number" ]] && ip_number="1"
 		ip=$(ip -4 addr | grep inet | grep -vE '127(\.[0-9]{1,3}){3}' | cut -d '/' -f 1 | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}' | sed -n "$ip_number"p)
 	fi
-
-	server_ip_local_netmask=$(ifconfig eth0 | grep -w 'inet' | awk -F'[ :]+' '{print $5}')
+	server_ip_local_netmask=$(ifconfig -a|grep $ip | grep -w 'inet' | awk -F'[ :]+' '{print $5}')
 
 	server_ip_local_net_cdr=$(mask2cdr $server_ip_local_netmask)
-
 	case "$server_ip_local_net_cdr" in
 	8)
 		server_ip_local_net=$(echo $ip | awk -F'.' '{print $1".0.0.0"}')
@@ -544,8 +546,8 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 	echo
 
 	echo "配置客户端IP地址池网段模式:"
-	echo "   1. 单网络段模式（所有客户端分配至在一个网络地址段中,适用于客户端个数小于<254个的情况）"
-	echo "   2. 多网络段模式（可将客户端根据角色分配到不同网络段中,,适用于客户端个数小于>254个的情况）"
+	echo "   1. 单网络段模式（所有客户端分配至在一个网络地址段中,适用于客户端个数少于254个的情况）"
+	echo "   2. 多网络段模式（可将客户端根据角色分配到不同网络段中,适用于客户端个数少于254个的情况）"
 	read -p "客户端IP地址池网段模式[1]: " server_ip_subnet_option
 	until [[ -z "$server_ip_subnet_option" || "$server_ip_subnet_option" =~ ^[1|2]$ ]]; do
 		read -p "$server_ip_subnet_option 为无效的选项。客户端IP地址池网段模式[1]: " server_ip_subnet_option
@@ -575,7 +577,12 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 		esac
 		;;
 	2)
-		echo "未实现功能，敬请期待！"
+		read -p "设置客户端网络段个数: " server_ip_subnet_nu
+		until [[ -z "$server_ip_subnet_nu" || ${server_ip_subnet_nu} =~ ^[1-9]{1}$ ]];do
+			echo "$server_ip_subnet_nu为无效值"
+			read -p "请重新设置客户端网络段个数: " server_ip_subnet_nu
+		done
+
 		exit 1
 		;;
 	esac
