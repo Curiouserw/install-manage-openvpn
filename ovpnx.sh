@@ -329,7 +329,6 @@ Content-Disposition: attachment; filename=\"OpenVPN-MacOS.ovpn\"
 }
 
 new_client() {
-
 	check_smtp_server_profile
 	if [ $? -eq 0 ]; then
 		case "$client_role" in
@@ -454,6 +453,10 @@ mask2cdr() {
 	echo $(($2 + (${#x} / 4)))
 }
 
+generateIpPoolsFile(){
+	seq -f "$1.%g" 2 254 > $2 
+}
+
 if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 	system_check
 	clear
@@ -475,7 +478,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 		echo
 		echo "OpenVPN服务端监听在以下哪个IPv4地址上?"
 		ip -4 addr | grep inet | grep -vE '127(\.[0-9]{1,3}){3}' | cut -d '/' -f 1 | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}' | nl -s ') '
-		read -p "IPv4地址[1]: " ip_number
+		read -p "IPv4地址，默认[1]: " ip_number
 		until [[ -z "$ip_number" || "$ip_number" =~ ^[0-9]+$ && "$ip_number" -le "$number_of_ip" ]]; do
 			echo "$ip_number: 无效的选项."
 			read -p "IPv4地址[1]: " ip_number
@@ -527,9 +530,9 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 	echo
 
 	echo "配置OpenVPN使用的通信协议?"
-	echo "   1) TCP (推荐)"
-	echo "   2) UDP"
-	read -p "默认协议[1]: " protocol
+	echo -e "  1) \033[41;30mTCP (推荐)\033[0m"
+	echo -e "  2) \033[41;30mUDP\033[0m"
+	read -p "默认协议（默认TCP[1]）: " protocol
 	until [[ -z "$protocol" || "$protocol" =~ ^[12]$ ]]; do
 		echo "$protocol: 无效的选项."
 		read -p "Protocol [1]: " protocol
@@ -546,21 +549,24 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 	echo
 
 	echo "配置客户端IP地址池网段模式:"
-	echo "   1. 单网络段模式（所有客户端分配至在一个网络地址段中,适用于客户端个数少于254个的情况）"
-	echo "   2. 多网络段模式（可将客户端根据角色分配到不同网络段中,适用于客户端个数少于254个的情况）"
-	read -p "客户端IP地址池网段模式[1]: " server_ip_subnet_option
+	echo -e "  1) 单网络段模式：\033[41;30m所有客户端分配至在一个网络段中,所有用户访问相同的服务端网段。适用于客户端个数少于254个的情况\033[0m"
+	echo -e "  2) 多网络段模式：\033[41;30m可将客户端划分角色分配到不同网络段中,不同角色访问不同的服务端网段。同时适用于客户端个数多于254个的情况\033[0m"
+	read -p "客户端IP地址池网段模式（默认单网段模式[1]）: " server_ip_subnet_option
 	until [[ -z "$server_ip_subnet_option" || "$server_ip_subnet_option" =~ ^[1|2]$ ]]; do
 		read -p "$server_ip_subnet_option 为无效的选项。客户端IP地址池网段模式[1]: " server_ip_subnet_option
 	done
+	[[ -z "$server_ip_subnet_option" ]] && server_ip_subnet_option="1"
 	case "$server_ip_subnet_option" in
-	1 | "")
-		echo "配置OpenVPN客户端IP地址池网段"
-		echo "   1) 10.8.1.0"
-		echo "   2) 10.6.2.0"
-		echo "   3) 自定义"
-		read -p "默认分配客户端IP地址池网段[1]: " server_single_ip_net_option
+	1 )
+		echo "单网络段模式：配置OpenVPN客户端IP地址池网段"
+		echo -e "  1) \033[41;30m10.8.1.0\033[0m"
+		echo -e "  2) \033[41;30m10.6.2.0\033[0m"
+		echo -e "  3) \033[41;30m自定义客户端IP地址池网段\033[0m"
+		read -p "单网络段模式：默认分配客户端IP地址池网段[1]: " server_single_ip_net_option
+
+		[[ -z "$server_single_ip_net_option" ]] && server_single_ip_net_option="1"
 		case "$server_single_ip_net_option" in
-		1 | "")
+		1)
 			server_ip_net="10.8.1.0"
 			;;
 		2)
@@ -582,7 +588,8 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 			echo "$server_ip_subnet_nu为无效值"
 			read -p "请重新设置客户端网络段个数: " server_ip_subnet_nu
 		done
-
+		
+		
 		exit 1
 		;;
 	esac
@@ -851,7 +858,7 @@ crl-verify crl.pem" >>$INSTALL_DIR/server/server.conf
 	fi
 
 	if [[ "$setup_client_conn_server_net" =~ ^[yY]$ ]]; then
-		echo "push \\"route $server_ip_local_net $server_ip_local_netmask\\"" >>$INSTALL_DIR/server/server.conf
+		echo "push \"route $server_ip_local_net $server_ip_local_netmask\"" >>$INSTALL_DIR/server/server.conf
 	fi
 
 	if [[ "$setup_client_conn" =~ ^[yY]$ ]]; then
@@ -972,9 +979,10 @@ else
 	echo "选择以下功能:"
 	echo "   0) 配置SMTP"
 	echo "   1) 添加用户"
-	echo "   2) 删除用户"
-	echo "   3) 卸载OpenVPN"
-	echo "   4) 退出"
+	echo "   2) 查看已有用户"
+	echo "   3) 删除用户"
+	echo "   4) 卸载OpenVPN"
+	echo "   5) 退出"
 	read -p "功能选项: " option
 	until [[ "$option" =~ ^[0-4]$ ]]; do
 		read -p "$option为无效的选项，请重新输入选项: " option
@@ -995,11 +1003,29 @@ else
 		echo "  2. 测试人员"
 		echo "  3. 业务人员"
 		echo "  4. 运维人员"
-		read -p "请设置用户角色(1|2|3|4) ? " client_role
-		until [[ -z "$client_role" || "$client_role" =~ ^[1|2|3|4]$ ]]; do
-			echo "$client_role: 无效的选项."
-			read -p "请重新设置用户角色" client_role
+		echo "  5. 机器人"
+		read -p "请设置用户角色(1|2|3|4|5) ? " client_role_nu
+		until [[ -z "$client_role_nu" || "$client_role_nu" =~ ^[1|2|3|4]$ ]]; do
+			echo "$client_role_nu: 无效的选项."
+			read -p "请重新设置用户角色" client_role_nu
 		done
+		case "$client_role_nu" in
+			1)
+				client_role=developer
+			;;
+			2)
+				client_role=tester
+			;;
+			3)
+				client_role=business
+			;;
+			4)
+				client_role=manager
+			;;
+			5)
+				client_role=robots
+			;;
+		esac
 
 		read -p "设置用户邮箱: " user_email_address
 		until [[ -z ${user_email_address+x} || ${user_email_address} =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$ ]]; do
@@ -1010,18 +1036,19 @@ else
 		exit
 		;;
 	2)
-		# This option could be documented a bit better and maybe even be simplified
-		# ...but what can I say, I want some sleep too
+		tail -n +2 $INSTALL_DIR/server/easy-rsa/pki/index.txt | grep "^V" | cut -d '=' -f 2 | nl -s ') '
+		;;
+	3)
 		number_of_clients=$(tail -n +2 $INSTALL_DIR/server/easy-rsa/pki/index.txt | grep -c "^V")
 		if [[ "$number_of_clients" = 0 ]]; then
 			echo
 			echo "暂时没有已存在的客户端用户"
 			exit
-		fi
+		fi		
 		echo
 		echo "请选择要删除的客户端用户:"
 		tail -n +2 $INSTALL_DIR/server/easy-rsa/pki/index.txt | grep "^V" | cut -d '=' -f 2 | nl -s ') '
-		read -p "用户名: " client_number
+		read -p "用户编号: " client_number
 		until [[ "$client_number" =~ ^[0-9]+$ && "$client_number" -le "$number_of_clients" ]]; do
 			echo "$client_number: 无效的选项."
 			read -p "用户编号: " client_number
@@ -1063,14 +1090,14 @@ else
 		fi
 		exit
 		;;
-	3)
+	4)
 		echo
-		read -p "请确认是否卸载OpenVPN? [y/N]: " remove
-		until [[ "$remove" =~ ^[yYnN]*$ ]]; do
+		read -p "请确认是否卸载OpenVPN? [Y/N]: " remove
+		until [[ "$remove" =~ ^[YN]*$ ]]; do
 			echo "$remove: 无效的选项."
-			read -p "请确认是否卸载OpenVPN? [y/N]: " remove
+			read -p "请确认是否卸载OpenVPN? [Y/N]: " remove
 		done
-		if [[ "$remove" =~ ^[yY]$ ]]; then
+		if [[ "$remove" =~ ^[Y]$ ]]; then
 			port=$(grep '^port ' $INSTALL_DIR/server/server.conf | cut -d " " -f 2)
 			protocol=$(grep '^proto ' $INSTALL_DIR/server/server.conf | cut -d " " -f 2)
 			if systemctl is-active --quiet firewalld.service; then
@@ -1112,7 +1139,7 @@ else
 		fi
 		exit
 		;;
-	4)
+	5)
 		exit
 		;;
 	esac
