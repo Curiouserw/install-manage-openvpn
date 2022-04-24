@@ -610,55 +610,70 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 		esac
 		;;
 	2)
-		echo "内置角色网段划分，可根据编号选择，多个已逗号分割："
+
+		read -p "请客户端IP地址池主网段(例如：10.6.0.0): " server_ip_net
+		until [[ -z "$server_ip_net" || $server_ip_net =~ ^[1-9][0-9]{1,3}\.[0-9]{1,3}\.0\.0$ && $(echo $server_ip_net | awk -F. '$1<255&&$2<255&&$3<255&&$4<255{print "yes"}') == "yes" ]]; do
+			echo "$server_ip_net为无效的IP地址池网段"
+			read -p "请设置有效的客户端IP地址池网段: " server_ip_net
+		done
+		server_ip_net_prefix=$(echo $server_ip_net | cut -d . -f 1,2)
+		echo "请设置客户端角色，内置角色网段划分，可根据编号选择，多个已逗号分割："
 		echo -e "  1) \033[41;30m开发人员角色\033[0m"
 		echo -e "  2) \033[41;30m测试人员角色\033[0m"
 		echo -e "  3) \033[41;30m运维人员角色\033[0m"
 		echo -e "  4) \033[41;30m业务人员角色\033[0m"
 		echo -e "  5) \033[41;30m机器人 角 色\033[0m"
-
 		read -p "请选择预设置客户端角色: " server_ip_subnet_roles
 		until [[ -z "$server_ip_subnet_roles" || ${server_ip_subnet_roles} =~ ^[1-9,]{1,9}$ ]];do
 			echo "$server_ip_subnet_roles为无效值"
-			read -p "请重新选择预设置客户端角色: " server_ip_subnet_roles
+			read -p "请重新设置客户端角色: " server_ip_subnet_roles
 		done
 
 		for i in ${server_ip_subnet_roles//,/ };do
 			case $i in
 				1)
 					read -p "请设置开发人员角色IP地址网段：" server_subnet_developer_ip_pool
-					until [[ -z "$server_subnet_developer_ip_pool" || $server_subnet_developer_ip_pool =~ ^[1-9][0-9]{1,3}\.[1-9]{1,3}\.[1-9]{1,3}\.0$ ]]; do
-						echo "$server_subnet_developer_ip_pool为无效的IP地址池网段"
-						read -p "请重新设置开发人员角色IP地址网段: " server_subnet_developer_ip_pool
+					until [[ -z "$server_subnet_developer_ip_pool" || $server_subnet_developer_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
+						read -p "$server_subnet_developer_ip_poo不属于$server_ip_net下的子网段，请重新设置开发人员角色IP地址网段: " server_subnet_developer_ip_pool
 					done
 				;;
 				2)
 					read -p "请设置测试人员角色IP地址网段：" server_subnet_tester_ip_pool
-					until [[ -z "$server_subnet_tester_ip_pool" || $server_subnet_tester_ip_pool =~ ^[1-9][0-9]{1,3}\.[0-9]{1,3}\.[1-9]{1,3}\.0$ ]]; do
-						echo "$server_subnet_tester_ip_pool为无效的IP地址池网段"
-						read -p "请重新设置测试人员角色IP地址网段: " server_subnet_tester_ip_pool
+					until [[ -z "$server_subnet_tester_ip_pool" || ! $server_subnet_tester_ip_pool == $server_subnet_developer_ip_pool ]];do
+						read -p "$server_subnet_tester_ip_pool网段已被占用，请重新设置测试人员角色IP地址网段：" server_subnet_tester_ip_pool
+						until [[ $server_subnet_tester_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
+							read -p "$server_subnet_tester_ip_pool不属于$server_ip_net下的子网段，请重新设置测试人员角色IP地址网段: " server_subnet_tester_ip_pool
+						done
 					done
 				;;
 				3)
 					read -p "请设置运维人员角色IP地址网段：" server_subnet_manager_ip_pool
-					until [[ -z "$server_subnet_manager_ip_pool" || $server_subnet_manager_ip_pool =~ ^[1-9][0-9]{1,3}\.[0-9]{1,3}\.[1-9]{1,3}\.0$ ]]; do
-						echo "$server_subnet_manager_ip_pool为无效的IP地址池网段"
-						read -p "请重新设置运维人员角色IP地址网段: " server_subnet_manager_ip_pool
+					until [[ -z "$server_subnet_manager_ip_pool" || ! $server_subnet_manager_ip_pool == $server_subnet_developer_ip_pool && ! $server_subnet_manager_ip_pool == $server_subnet_tester_ip_pool ]]; do
+						read -p "$server_subnet_manager_ip_pool网段已被占用，请重新设置运维人员角色IP地址网段：" server_subnet_manager_ip_pool
+						until [[ $server_subnet_manager_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
+							read -p "$server_subnet_manager_ip_pool不属于$server_ip_net下的子网段，请重新设置运维人员角色IP地址网段: " server_subnet_manager_ip_pool
+						done
 					done
 				;;
 				4)
 					read -p "请设置业务人员角色IP地址网段：" server_subnet_bussiness_ip_pool
-					until [[ -z "$server_subnet_bussiness_ip_pool" || $server_subnet_bussiness_ip_pool =~ ^[1-9][0-9]{1,3}\.[0-9]{1,3}\.[1-9]{1,3}\.0$ ]]; do
-						echo "$server_subnet_bussiness_ip_pool为无效的IP地址池网段"
-						read -p "请重新设置业务人员角色IP地址网段: " server_subnet_bussiness_ip_pool
+
+					until [[ -z "$server_subnet_bussiness_ip_pool" || ! $server_subnet_bussiness_ip_pool == $server_subnet_developer_ip_pool && ! $server_subnet_bussiness_ip_pool == $server_subnet_tester_ip_pool && ! $server_subnet_bussiness_ip_pool == $server_subnet_manager_ip_pool ]]; do
+						read -p "$server_subnet_bussiness_ip_pool网段已被占用，请重新设置业务人员角色IP地址网段：" server_subnet_bussiness_ip_pool
+						until [[ $server_subnet_bussiness_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
+							read -p "$server_subnet_bussiness_ip_pool不属于$server_ip_net下的子网段，请重新设置业务人员角色IP地址网段: " server_subnet_bussiness_ip_pool
+						done
 					done
 				;;
 				5)
 					read -p "请设置机器人 角 色IP地址网段：" server_subnet_robots_ip_pool
-					until [[ -z "$server_subnet_robots_ip_pool" || $server_subnet_robots_ip_pool =~ ^[1-9][0-9]{1,3}\.[0-9]{1,3}\.[1-9]{1,3}\.0$ ]]; do
-						echo "$server_subnet_robots_ip_pool为无效的IP地址池网段"
-						read -p "请重新设置机器人角色IP地址网段: " server_subnet_robots_ip_pool
-					done
+					
+					until [[ -z "$server_subnet_robots_ip_pool" || ! $server_subnet_robots_ip_pool == $server_subnet_developer_ip_pool && ! $server_subnet_robots_ip_pool == $server_subnet_tester_ip_pool && ! $server_subnet_robots_ip_pool == $server_subnet_manager_ip_pool && ! $server_subnet_robots_ip_pool == $server_subnet_bussiness_ip_pool ]]; do
+						read -p "$server_subnet_robots_ip_pool网段已被占用，请重新设置机器人角色IP地址网段：" server_subnet_robots_ip_pool
+						until [[ $server_subnet_robots_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
+							read -p "$server_subnet_robots_ip_pool不属于$server_ip_net下的子网段，请重新设置机器人角色IP地址网段: " server_subnet_robots_ip_pool
+						done
+					done				
 				;;
 			esac
 		done
@@ -797,10 +812,7 @@ LimitNPROC=infinity" >/etc/systemd/system/openvpn-server@server.service.d/disabl
 	echo "  正在下载easy-rsa证书工具"
 	{ wget -qO- "$easy_rsa_url" 2>/dev/null || curl -# -sL "$easy_rsa_url"; } | tar xz -C $INSTALL_DIR/server/easy-rsa/ --strip-components 1
 	chown -R root:root $INSTALL_DIR/server
-
-
-	#
-	set -x 
+	
 	if [[ ! -z "$server_subnet_developer_ip_pool" ]]; then
 		genMultiRoleSubnetProfile developer ${server_subnet_developer_ip_pool%.*}
 	fi
@@ -816,7 +828,6 @@ LimitNPROC=infinity" >/etc/systemd/system/openvpn-server@server.service.d/disabl
 	if  [[ ! -z "$server_subnet_robots_ip_pool" ]]; then
 		genMultiRoleSubnetProfile robots ${server_subnet_robots_ip_pool%.*}
 	fi
-	set +x
 	# 创建CA和客户端证书
 	cd $INSTALL_DIR/server/easy-rsa/
 	echo "  正在创建CA和客户端证书"
