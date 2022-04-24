@@ -328,6 +328,35 @@ Content-Disposition: attachment; filename=\"OpenVPN-MacOS.ovpn\"
 	fi
 }
 
+# $1参数是角色名称，可选“developer、tester、bussiness、manager、robots”。
+# $2参数是角色的IP地址网络段，格式例如：10.11.12。
+genMultiRoleSubnetProfile(){
+	set -x 
+	case "$1" in 
+		developer)
+			seq -f "$2.%g" 2 254 > $INSTALL_DIR/server/ip-pools/developer-ip-pools
+			touch $INSTALL_DIR/client/clientsinfo-developer
+		;;
+		tester)
+			seq -f "$2.%g" 2 254 > $INSTALL_DIR/server/ip-pools/tester-ip-pools
+			touch $INSTALL_DIR/client/clientsinfo-tester
+		;;
+		business)
+			seq -f "$2.%g" 2 254 > $INSTALL_DIR/server/ip-pools/business-ip-pools
+			touch $INSTALL_DIR/client/clientsinfo-business
+		;;
+		manager)
+			seq -f "$2.%g" 2 254 > $INSTALL_DIR/server/ip-pools/manager-ip-pools
+			touch $INSTALL_DIR/client/clientsinfo-manager
+		;;
+		robots)
+			seq -f "$2.%g" 2 254 > $INSTALL_DIR/server/ip-pools/robots-ip-pools
+			touch $INSTALL_DIR/client/clientsinfo-robots
+		;;
+	esac
+	set +x
+}
+
 new_client() {
 	check_smtp_server_profile
 	if [ $? -eq 0 ]; then
@@ -350,7 +379,7 @@ new_client() {
 				echo "<tls-crypt>"
 				sed -ne '/BEGIN OpenVPN Static key/,$ p' $INSTALL_DIR/server/tc.key
 				echo "</tls-crypt>"
-			} >$INSTALL_DIR/client/"$client".ovpn
+			} >$INSTALL_DIR/client/profiles/"$client".ovpn
 			client_random_password=$(echo $(date +%s)$RANDOM | md5sum | head -c 15)
 			echo "$client $client_random_password" >>$INSTALL_DIR/server/psw-file
 			if [[ ! -f $INSTALL_DIR/server/ccd/$client ]]; then
@@ -377,7 +406,7 @@ new_client() {
 				echo "<tls-crypt>"
 				sed -ne '/BEGIN OpenVPN Static key/,$ p' $INSTALL_DIR/server/tc.key
 				echo "</tls-crypt>"
-			} >$INSTALL_DIR/client/"$client".ovpn
+			} >$INSTALL_DIR/client/profiles/"$client".ovpn
 			client_random_password=$(echo $(date +%s)$RANDOM | md5sum | head -c 15)
 			echo "$client $client_random_password" >>$INSTALL_DIR/server/psw-file
 			if [[ ! -f $INSTALL_DIR/server/ccd/$client ]]; then
@@ -404,7 +433,7 @@ new_client() {
 				echo "<tls-crypt>"
 				sed -ne '/BEGIN OpenVPN Static key/,$ p' $INSTALL_DIR/server/tc.key
 				echo "</tls-crypt>"
-			} >$INSTALL_DIR/client/"$client".ovpn
+			} >$INSTALL_DIR/client/profiles/"$client".ovpn
 			client_random_password=$(echo $(date +%s)$RANDOM | md5sum | head -c 15)
 			echo "$client $client_random_password" >>$INSTALL_DIR/server/psw-file
 			if [[ ! -f $INSTALL_DIR/server/ccd/$client ]]; then
@@ -431,7 +460,7 @@ new_client() {
 				echo "<tls-crypt>"
 				sed -ne '/BEGIN OpenVPN Static key/,$ p' $INSTALL_DIR/server/tc.key
 				echo "</tls-crypt>"
-			} >$INSTALL_DIR/client/"$client".ovpn
+			} >$INSTALL_DIR/client/profiles/"$client".ovpn
 			client_random_password=$(echo $(date +%s)$RANDOM | md5sum | head -c 15)
 			echo "$client $client_random_password" >>$INSTALL_DIR/server/psw-file
 			if [[ ! -f $INSTALL_DIR/server/ccd/$client ]]; then
@@ -442,7 +471,7 @@ new_client() {
 			;;
 		esac
 
-		send_email $1 $client $client_random_password $INSTALL_DIR/client/$client.ovpn
+		send_email $1 $client $client_random_password $INSTALL_DIR/client/profiles/$client.ovpn
 	fi
 }
 
@@ -453,9 +482,7 @@ mask2cdr() {
 	echo $(($2 + (${#x} / 4)))
 }
 
-generateIpPoolsFile(){
-	seq -f "$1.%g" 2 254 > $2 
-}
+
 
 if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 	system_check
@@ -583,14 +610,58 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 		esac
 		;;
 	2)
-		read -p "设置客户端网络段个数: " server_ip_subnet_nu
-		until [[ -z "$server_ip_subnet_nu" || ${server_ip_subnet_nu} =~ ^[1-9]{1}$ ]];do
-			echo "$server_ip_subnet_nu为无效值"
-			read -p "请重新设置客户端网络段个数: " server_ip_subnet_nu
+		echo "内置角色网段划分，可根据编号选择，多个已逗号分割："
+		echo -e "  1) \033[41;30m开发人员角色\033[0m"
+		echo -e "  2) \033[41;30m测试人员角色\033[0m"
+		echo -e "  3) \033[41;30m运维人员角色\033[0m"
+		echo -e "  4) \033[41;30m业务人员角色\033[0m"
+		echo -e "  5) \033[41;30m机器人 角 色\033[0m"
+
+		read -p "请选择预设置客户端角色: " server_ip_subnet_roles
+		until [[ -z "$server_ip_subnet_roles" || ${server_ip_subnet_roles} =~ ^[1-9,]{1,9}$ ]];do
+			echo "$server_ip_subnet_roles为无效值"
+			read -p "请重新选择预设置客户端角色: " server_ip_subnet_roles
 		done
-		
-		
-		exit 1
+
+		for i in ${server_ip_subnet_roles//,/ };do
+			case $i in
+				1)
+					read -p "请设置开发人员角色IP地址网段：" server_subnet_developer_ip_pool
+					until [[ -z "$server_subnet_developer_ip_pool" || $server_subnet_developer_ip_pool =~ ^[1-9][0-9]{1,3}\.[1-9]{1,3}\.[1-9]{1,3}\.0$ ]]; do
+						echo "$server_subnet_developer_ip_pool为无效的IP地址池网段"
+						read -p "请重新设置开发人员角色IP地址网段: " server_subnet_developer_ip_pool
+					done
+				;;
+				2)
+					read -p "请设置测试人员角色IP地址网段：" server_subnet_tester_ip_pool
+					until [[ -z "$server_subnet_tester_ip_pool" || $server_subnet_tester_ip_pool =~ ^[1-9][0-9]{1,3}\.[0-9]{1,3}\.[1-9]{1,3}\.0$ ]]; do
+						echo "$server_subnet_tester_ip_pool为无效的IP地址池网段"
+						read -p "请重新设置测试人员角色IP地址网段: " server_subnet_tester_ip_pool
+					done
+				;;
+				3)
+					read -p "请设置运维人员角色IP地址网段：" server_subnet_manager_ip_pool
+					until [[ -z "$server_subnet_manager_ip_pool" || $server_subnet_manager_ip_pool =~ ^[1-9][0-9]{1,3}\.[0-9]{1,3}\.[1-9]{1,3}\.0$ ]]; do
+						echo "$server_subnet_manager_ip_pool为无效的IP地址池网段"
+						read -p "请重新设置运维人员角色IP地址网段: " server_subnet_manager_ip_pool
+					done
+				;;
+				4)
+					read -p "请设置业务人员角色IP地址网段：" server_subnet_bussiness_ip_pool
+					until [[ -z "$server_subnet_bussiness_ip_pool" || $server_subnet_bussiness_ip_pool =~ ^[1-9][0-9]{1,3}\.[0-9]{1,3}\.[1-9]{1,3}\.0$ ]]; do
+						echo "$server_subnet_bussiness_ip_pool为无效的IP地址池网段"
+						read -p "请重新设置业务人员角色IP地址网段: " server_subnet_bussiness_ip_pool
+					done
+				;;
+				5)
+					read -p "请设置机器人 角 色IP地址网段：" server_subnet_robots_ip_pool
+					until [[ -z "$server_subnet_robots_ip_pool" || $server_subnet_robots_ip_pool =~ ^[1-9][0-9]{1,3}\.[0-9]{1,3}\.[1-9]{1,3}\.0$ ]]; do
+						echo "$server_subnet_robots_ip_pool为无效的IP地址池网段"
+						read -p "请重新设置机器人角色IP地址网段: " server_subnet_robots_ip_pool
+					done
+				;;
+			esac
+		done
 		;;
 	esac
 
@@ -719,14 +790,35 @@ LimitNPROC=infinity" >/etc/systemd/system/openvpn-server@server.service.d/disabl
 		echo "  开启防火墙"
 		systemctl enable --now firewalld.service >/dev/null 2>&1
 	fi
-	# Get easy-rsa
+	# 下载安装证书工具easy-rsa
 	easy_rsa_url='https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.7/EasyRSA-3.0.7.tgz'
-	mkdir -p $INSTALL_DIR/server/easy-rsa/ $INSTALL_DIR/server/ccd $INSTALL_DIR/server/logs $INSTALL_DIR/server/ip-pools
+	mkdir -p $INSTALL_DIR/server/{easy-rsa,ccd,logs,ip-pools} $INSTALL_DIR/client/profiles
+	
 	echo "  正在下载easy-rsa证书工具"
 	{ wget -qO- "$easy_rsa_url" 2>/dev/null || curl -# -sL "$easy_rsa_url"; } | tar xz -C $INSTALL_DIR/server/easy-rsa/ --strip-components 1
 	chown -R root:root $INSTALL_DIR/server
+
+
+	#
+	set -x 
+	if [[ ! -z "$server_subnet_developer_ip_pool" ]]; then
+		genMultiRoleSubnetProfile developer ${server_subnet_developer_ip_pool%.*}
+	fi
+	if [[ ! -z "$server_subnet_tester_ip_pool" ]]; then
+		genMultiRoleSubnetProfile tester ${server_subnet_tester_ip_pool%.*}
+	fi
+	if  [[ ! -z "$server_subnet_manager_ip_pool" ]]; then
+		genMultiRoleSubnetProfile manager ${server_subnet_manager_ip_pool%.*}
+	fi
+	if  [[ ! -z "$server_subnet_bussiness_ip_pool" ]]; then
+		genMultiRoleSubnetProfile bussiness ${server_subnet_bussiness_ip_pool%.*}
+	fi
+	if  [[ ! -z "$server_subnet_robots_ip_pool" ]]; then
+		genMultiRoleSubnetProfile robots ${server_subnet_robots_ip_pool%.*}
+	fi
+	set +x
+	# 创建CA和客户端证书
 	cd $INSTALL_DIR/server/easy-rsa/
-	# Create the PKI, set up the CA and the server and client certificates
 	echo "  正在创建CA和客户端证书"
 	./easyrsa init-pki >/dev/null 2>&1
 	./easyrsa --batch build-ca nopass >/dev/null 2>&1
@@ -750,7 +842,9 @@ YdEIqUuyyOP7uWrat2DX9GgdT0Kj3jlN9K5W7edjcrsZCwenyO4KbXCeAvzhzffi
 7MA0BM0oNC9hkXL+nOmFg/+OTxIy7vKBg8P+OxtMb61zO7X8vC7CIAXFjvGDfRaD
 ssbzSibBsu/6iGtCOGEoXJf//////////wIBAg==
 -----END DH PARAMETERS-----' >$INSTALL_DIR/server/dh.pem
-	# Generate server.conf
+
+
+	# 生成OpenVPN服务端配置文件
 	echo "  正在生成OpenVPN服务端配置文件"
 	echo "local 0.0.0.0
 port $port
@@ -1017,10 +1111,10 @@ else
 				client_role=tester
 			;;
 			3)
-				client_role=business
+				client_role=manager
 			;;
 			4)
-				client_role=manager
+				client_role=business
 			;;
 			5)
 				client_role=robots
@@ -1067,7 +1161,7 @@ else
 			cp $INSTALL_DIR/server/easy-rsa/pki/crl.pem $INSTALL_DIR/server/crl.pem
 			# CRL is read with each client connection, when OpenVPN is dropped to nobody
 			chown nobody:"$group_name" $INSTALL_DIR/server/crl.pem
-			rm -f $INSTALL_DIR/client/$client.ovpn
+			rm -f $INSTALL_DIR/client/profiles/$client.ovpn
 			sed -i "/\<$client\>/d" $INSTALL_DIR/server/psw-file
 			if [[ -f $INSTALL_DIR/server/ccd/$client ]]; then
 				client_ip_ready_release=$(grep "ifconfig-push" $INSTALL_DIR/server/ccd/$client | awk '{print $2}')
