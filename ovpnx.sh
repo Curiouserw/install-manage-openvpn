@@ -503,7 +503,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 	else
 		number_of_ip=$(ip -4 addr | grep inet | grep -vEc '127(\.[0-9]{1,3}){3}')
 		echo
-		echo "OpenVPN服务端监听在以下哪个IPv4地址上?"
+		echo "1. OpenVPN服务端监听在以下哪个IPv4地址上?"
 		ip -4 addr | grep inet | grep -vE '127(\.[0-9]{1,3}){3}' | cut -d '/' -f 1 | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}' | nl -s ') '
 		read -p "IPv4地址，默认[1]: " ip_number
 		until [[ -z "$ip_number" || "$ip_number" =~ ^[0-9]+$ && "$ip_number" -le "$number_of_ip" ]]; do
@@ -556,7 +556,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 
 	echo
 
-	echo "配置OpenVPN使用的通信协议?"
+	echo "2. 配置OpenVPN使用的通信协议?"
 	echo -e "  1) \033[41;30mTCP (推荐)\033[0m"
 	echo -e "  2) \033[41;30mUDP\033[0m"
 	read -p "默认协议（默认TCP[1]）: " protocol
@@ -575,7 +575,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 
 	echo
 
-	echo "配置客户端IP地址池网段模式:"
+	echo "3. 配置客户端IP地址池网段模式:"
 	echo -e "  1) 单网络段模式：\033[41;30m所有客户端分配至在一个网络段中,所有用户访问相同的服务端网段。适用于客户端个数少于254个的情况\033[0m"
 	echo -e "  2) 多网络段模式：\033[41;30m可将客户端划分角色分配到不同网络段中,不同角色访问不同的服务端网段。同时适用于客户端个数多于254个的情况\033[0m"
 	read -p "客户端IP地址池网段模式（默认单网段模式[1]）: " server_ip_subnet_option
@@ -583,9 +583,11 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 		read -p "$server_ip_subnet_option 为无效的选项。客户端IP地址池网段模式[1]: " server_ip_subnet_option
 	done
 	[[ -z "$server_ip_subnet_option" ]] && server_ip_subnet_option="1"
+	echo
+	 
 	case "$server_ip_subnet_option" in
 	1 )
-		echo "单网络段模式：配置OpenVPN客户端IP地址池网段"
+		echo "4. 单网络段模式：配置OpenVPN客户端IP地址池网段"
 		echo -e "  1) \033[41;30m10.8.1.0\033[0m"
 		echo -e "  2) \033[41;30m10.6.2.0\033[0m"
 		echo -e "  3) \033[41;30m自定义客户端IP地址池网段\033[0m"
@@ -603,75 +605,79 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 			read -p "请输入自定义的客户端IP地址池网段(规则: 四段位,前三段位数值范围1~254,最后一段需为0): " unsanitized_server_ip_net
 			server_ip_net=$(sed 's/[^[1-9][0-9]{1,3}\.[0-9]{1,3}\.[1-9][0-9]{1,3}\.0$]/_/g' <<<"$unsanitized_server_ip_net")
 			until [[ -z "$server_ip_net" || $server_ip_net =~ ^[1-9][0-9]{1,3}\.[0-9]{1,3}\.[1-9][0-9]{1,3}\.0$ && $(echo $server_ip_net | awk -F. '$1<255&&$2<255&&$3<255&&$4<255{print "yes"}') == "yes" ]]; do
-				echo "$server_ip_net为无效的IP地址池网段"
-				read -p "请输入有效的客户端IP地址池网段: " server_ip_net
+				echo "  $server_ip_net为无效的IP地址池网段"
+				read -p "  请输入有效的客户端IP地址池网段: " server_ip_net
 			done
 			;;
 		esac
 		;;
 	2)
 
-		read -p "请客户端IP地址池主网段(例如：10.6.0.0): " server_ip_net
+		read -p "4. 请客户端IP地址池主网段(例如：10.6.0.0): " server_ip_net
 		until [[ -z "$server_ip_net" || $server_ip_net =~ ^[1-9][0-9]{1,3}\.[0-9]{1,3}\.0\.0$ && $(echo $server_ip_net | awk -F. '$1<255&&$2<255&&$3<255&&$4<255{print "yes"}') == "yes" ]]; do
-			echo "$server_ip_net为无效的IP地址池网段"
-			read -p "请设置有效的客户端IP地址池网段: " server_ip_net
+			echo "  $server_ip_net为无效的IP地址池网段"
+			read -p "  请设置有效的客户端IP地址池网段: " server_ip_net
 		done
+		echo 
 		server_ip_net_prefix=$(echo $server_ip_net | cut -d . -f 1,2)
-		echo "请设置客户端角色，内置角色网段划分，可根据编号选择，多个已逗号分割："
+		echo "5. 请设置客户端角色，内置角色网段划分，可根据编号选择，多个已逗号分割："
 		echo -e "  1) \033[41;30m开发人员角色\033[0m"
 		echo -e "  2) \033[41;30m测试人员角色\033[0m"
 		echo -e "  3) \033[41;30m运维人员角色\033[0m"
 		echo -e "  4) \033[41;30m业务人员角色\033[0m"
 		echo -e "  5) \033[41;30m机器人 角 色\033[0m"
+		echo -e "  6) \033[41;30m以上所有角色\033[0m"
 		read -p "请选择预设置客户端角色: " server_ip_subnet_roles
 		until [[ -z "$server_ip_subnet_roles" || ${server_ip_subnet_roles} =~ ^[1-9,]{1,9}$ ]];do
-			echo "$server_ip_subnet_roles为无效值"
+			echo "  $server_ip_subnet_roles为无效值"
 			read -p "请重新设置客户端角色: " server_ip_subnet_roles
 		done
-
+		if [[ $server_ip_subnet_roles == 6 ]];then
+			server_ip_subnet_roles=1,2,3,4,5
+		fi
 		for i in ${server_ip_subnet_roles//,/ };do
 			case $i in
 				1)
-					read -p "请设置开发人员角色IP地址网段：" server_subnet_developer_ip_pool
+					read -e -p "  请设置开发人员角色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_developer_ip_pool
 					until [[ -z "$server_subnet_developer_ip_pool" || $server_subnet_developer_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
-						read -p "$server_subnet_developer_ip_poo不属于$server_ip_net下的子网段，请重新设置开发人员角色IP地址网段: " server_subnet_developer_ip_pool
+						read -p "  $server_subnet_developer_ip_pool不属于$server_ip_net下的子网段，请重新设置开发人员角色IP地址网段: " server_subnet_developer_ip_pool
 					done
 				;;
 				2)
-					read -p "请设置测试人员角色IP地址网段：" server_subnet_tester_ip_pool
+					read -e -p "  请设置测试人员角色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_tester_ip_pool
 					until [[ -z "$server_subnet_tester_ip_pool" || ! $server_subnet_tester_ip_pool == $server_subnet_developer_ip_pool ]];do
-						read -p "$server_subnet_tester_ip_pool网段已被占用，请重新设置测试人员角色IP地址网段：" server_subnet_tester_ip_pool
+						read -p "  $server_subnet_tester_ip_pool网段已被占用，请重新设置测试人员角色IP地址网段：" server_subnet_tester_ip_pool
 						until [[ $server_subnet_tester_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
-							read -p "$server_subnet_tester_ip_pool不属于$server_ip_net下的子网段，请重新设置测试人员角色IP地址网段: " server_subnet_tester_ip_pool
+							read -p "  $server_subnet_tester_ip_pool不属于$server_ip_net下的子网段，请重新设置测试人员角色IP地址网段: " server_subnet_tester_ip_pool
 						done
 					done
 				;;
 				3)
-					read -p "请设置运维人员角色IP地址网段：" server_subnet_manager_ip_pool
+					read -e -p "  请设置运维人员角色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_manager_ip_pool
 					until [[ -z "$server_subnet_manager_ip_pool" || ! $server_subnet_manager_ip_pool == $server_subnet_developer_ip_pool && ! $server_subnet_manager_ip_pool == $server_subnet_tester_ip_pool ]]; do
-						read -p "$server_subnet_manager_ip_pool网段已被占用，请重新设置运维人员角色IP地址网段：" server_subnet_manager_ip_pool
+						read -p "  $server_subnet_manager_ip_pool网段已被占用，请重新设置运维人员角色IP地址网段：" server_subnet_manager_ip_pool
 						until [[ $server_subnet_manager_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
-							read -p "$server_subnet_manager_ip_pool不属于$server_ip_net下的子网段，请重新设置运维人员角色IP地址网段: " server_subnet_manager_ip_pool
+							read -p "  $server_subnet_manager_ip_pool不属于$server_ip_net下的子网段，请重新设置运维人员角色IP地址网段: " server_subnet_manager_ip_pool
 						done
 					done
 				;;
 				4)
-					read -p "请设置业务人员角色IP地址网段：" server_subnet_bussiness_ip_pool
+					read -e -p "  请设置业务人员角色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_bussiness_ip_pool
 
 					until [[ -z "$server_subnet_bussiness_ip_pool" || ! $server_subnet_bussiness_ip_pool == $server_subnet_developer_ip_pool && ! $server_subnet_bussiness_ip_pool == $server_subnet_tester_ip_pool && ! $server_subnet_bussiness_ip_pool == $server_subnet_manager_ip_pool ]]; do
-						read -p "$server_subnet_bussiness_ip_pool网段已被占用，请重新设置业务人员角色IP地址网段：" server_subnet_bussiness_ip_pool
+						read -p "  $server_subnet_bussiness_ip_pool网段已被占用，请重新设置业务人员角色IP地址网段：" server_subnet_bussiness_ip_pool
 						until [[ $server_subnet_bussiness_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
-							read -p "$server_subnet_bussiness_ip_pool不属于$server_ip_net下的子网段，请重新设置业务人员角色IP地址网段: " server_subnet_bussiness_ip_pool
+							read -p "  $server_subnet_bussiness_ip_pool不属于$server_ip_net下的子网段，请重新设置业务人员角色IP地址网段: " server_subnet_bussiness_ip_pool
 						done
 					done
 				;;
 				5)
-					read -p "请设置机器人 角 色IP地址网段：" server_subnet_robots_ip_pool
+					read -e -p "  请设置机器人 角 色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_robots_ip_pool
 					
 					until [[ -z "$server_subnet_robots_ip_pool" || ! $server_subnet_robots_ip_pool == $server_subnet_developer_ip_pool && ! $server_subnet_robots_ip_pool == $server_subnet_tester_ip_pool && ! $server_subnet_robots_ip_pool == $server_subnet_manager_ip_pool && ! $server_subnet_robots_ip_pool == $server_subnet_bussiness_ip_pool ]]; do
-						read -p "$server_subnet_robots_ip_pool网段已被占用，请重新设置机器人角色IP地址网段：" server_subnet_robots_ip_pool
+						read -p "  $server_subnet_robots_ip_pool网段已被占用，请重新设置机器人角色IP地址网段：" server_subnet_robots_ip_pool
 						until [[ $server_subnet_robots_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
-							read -p "$server_subnet_robots_ip_pool不属于$server_ip_net下的子网段，请重新设置机器人角色IP地址网段: " server_subnet_robots_ip_pool
+							read -p "  $server_subnet_robots_ip_pool不属于$server_ip_net下的子网段，请重新设置机器人角色IP地址网段: " server_subnet_robots_ip_pool
 						done
 					done				
 				;;
@@ -682,16 +688,16 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 
 	echo
 
-	read -p "配置OpenVPN服务端监听的端口? 默认端口[11940]: " port
+	read -p "6. 配置OpenVPN服务端监听的端口? 默认端口[11940]: " port
 	until [[ -z "$port" || "$port" =~ ^[1-9]+$ && "$port" -le 65535 && "$port" -gt 1024 ]]; do
 		echo "$port 端口无效，请设置1025 <= => 65535范围之内的端口号: "
 		read -p "默认端口[1194]: " port
 	done
-	[[ -z "$port" ]] && port="1194"
+	[[ -z "$port" ]] && port="11940"
 
 	echo
 
-	read -p "是否在客户端配置文件中设置NAT的公网IP地址或域名[Yy/Nn]? " setup_client_profile_nat_pub_ip_domain
+	read -p "7. 是否在客户端配置文件中设置NAT的公网IP地址或域名[Yy/Nn]? " setup_client_profile_nat_pub_ip_domain
 	until [[ -z "$setup_client_profile_nat_pub_ip_domain" || "$setup_client_profile_nat_pub_ip_domain" =~ ^[yYnN]*$ ]]; do
 		read -p "$setup_client_profile_nat_pub_ip_domain为无效的选项,是否在客户端配置文件中设置NAT的公网IP地址或域名[Yy/Nn]? " setup_client_profile_nat_pub_ip_domain
 	done
@@ -720,25 +726,25 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 
 	echo
 
-	read -n1 -p "是否允许客户端间互联[Yy/Nn]? " setup_client_conn
+	read -p "8. 是否允许客户端间互联[Yy/Nn]? " setup_client_conn
 	until [[ -z "$setup_client_conn" || "$setup_client_conn" =~ ^[yYnN]*$ ]]; do
-		read -p "$setup_client_conn为无效的选项,是否允许客户端间互联[Yy/Nn]? " setup_client_conn
+		read -p "  $setup_client_conn为无效的选项,是否允许客户端间互联[Yy/Nn]? " setup_client_conn
 	done
 	[[ -z "$setup_client_conn" ]] && setup_client_conn="y"
 
 	echo
 
-	read -n1 -p "是否允许客户端访问服务端所在网段[Yy/Nn]? " setup_client_conn_server_net
+	read -p "9. 是否允许客户端访问服务端所在网段[Yy/Nn]? " setup_client_conn_server_net
 	until [[ -z "$setup_client_conn_server_net" || "$setup_client_conn_server_net" =~ ^[yYnN]*$ ]]; do
-		read -p "$setup_client_conn_server_net为无效的选项,是否允许客户端访问服务端所在网段[Yy/Nn]? " setup_client_conn_server_net
+		read -p "  $setup_client_conn_server_net为无效的选项,是否允许客户端访问服务端所在网段[Yy/Nn]? " setup_client_conn_server_net
 	done
 	[[ -z "$setup_client_conn_server_net" ]] && setup_client_conn_server_net="y"
 
 	echo
 
-	read -n1 -p "是否配置管理端口?[Yy/Nn]? " setup_management
+	read -p "10. 是否配置管理端口?[Yy/Nn]? " setup_management
 	until [[ -z "$setup_management" || "$setup_management" =~ ^[yYnN]*$ ]]; do
-		read -p "$setup_management为无效的选项，是否配置管理端口?[Yy/Nn] " setup_management
+		read -p "  $setup_management为无效的选项，是否配置管理端口?[Yy/Nn] " setup_management
 	done
 	[[ -z "$setup_management" ]] && setup_management="y"
 
@@ -746,18 +752,18 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 
 	case "$setup_management" in
 	y | Y)
-		read -p "设置管理端口[默认27506]: " management_port
+		read -p "  设置管理端口[默认27506]: " management_port
 		until [[ -z "$management_port" || ${management_port} =~ ^[0-9]{0,5}$ && $management_port -le 65535 && $management_port -gt 1024 ]]; do
-			read -p "$management_port为无效的端口，请重新设置1025 <= => 65535之内的端口: " management_port
+			read -p "  $management_port为无效的端口，请重新设置1025 <= => 65535之内的端口: " management_port
 		done
 		[[ -z "$management_port" ]] && management_port=27506
 
-		read -p $'设置管理端口登录密码。[默认生产15位随机0-9a-zA-Z字符串密码]: ' management_psw
+		read -p $'  设置管理端口登录密码(默认生产15位随机0-9a-zA-Z字符串密码): ' management_psw
 		until [[ -z "$management_psw" || ${management_psw} =~ ^[0-9a-zA-Z]{6,15}$ ]]; do
-			read -s -p "请重新设置更为复杂的密码: " management_psw
+			read -s -p "  设置的密码过于简单，请重新设置更为复杂的密码: " management_psw
 		done
 		[[ -z "$management_psw" ]] && management_psw=$(echo $(date +%s)$RANDOM | md5sum | base64 | head -c 15)
-		echo "[密码保存在了$INSTALL_DIR/server/management-psw-file文件中，更多管理端口的使用方法详见:https://openvpn.net/community-resources/management-interface]"
+		echo "  密码保存在了$INSTALL_DIR/server/management-psw-file文件中，更多管理端口的使用方法详见:https://openvpn.net/community-resources/management-interface"
 		;;
 	n | N) ;;
 
@@ -765,7 +771,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 
 	echo
 
-	echo "开始准备安装OpenVPN服务端"
+	echo "11. 开始准备安装OpenVPN服务端"
 	# Install a firewall in the rare case where one is not already available
 	if ! systemctl is-active --quiet firewalld.service && ! hash iptables 2>/dev/null; then
 		if [[ "$os" == "centos" || "$os" == "fedora" ]]; then
@@ -780,7 +786,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 		fi
 	fi
 	echo "  正在检查防火墙软件，当前操作系统的防护墙为: $firewall"
-	read -n1 -r -p "按任意键继续"
+	read -n1 -r -p "  按任意键继续"
 	# If running inside a container, disable LimitNPROC to prevent conflicts
 	if systemd-detect-virt -cq; then
 		mkdir /etc/systemd/system/openvpn-server@server.service.d/ 2>/dev/nul
