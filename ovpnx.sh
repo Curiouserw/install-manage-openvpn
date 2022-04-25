@@ -331,7 +331,6 @@ Content-Disposition: attachment; filename=\"OpenVPN-MacOS.ovpn\"
 # $1参数是角色名称，可选“developer、tester、bussiness、manager、robots”。
 # $2参数是角色的IP地址网络段，格式例如：10.11.12。
 genMultiRoleSubnetProfile(){
-	set -x 
 	case "$1" in 
 		developer)
 			seq -f "$2.%g" 2 254 > $INSTALL_DIR/server/ip-pools/developer-ip-pools
@@ -354,7 +353,6 @@ genMultiRoleSubnetProfile(){
 			touch $INSTALL_DIR/client/clientsinfo-robots
 		;;
 	esac
-	set +x
 }
 
 new_client() {
@@ -740,6 +738,28 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 	done
 	[[ -z "$setup_client_conn_server_net" ]] && setup_client_conn_server_net="y"
 
+    for i in ${server_ip_subnet_roles//,/ };do
+		case $i in
+			1)
+				read -p "  请设置开发人员角色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_developer_allow_net 
+
+			;;
+			2)
+				read -p "  请设置测试人员角色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_tester_allow_net 
+			;;
+			3)
+				read -p "  请设置运维人员角色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_manager_allow_net 
+			;;
+			4)
+				read -p "  请设置业务人员角色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_bussiness_allow_net 
+			;;
+			5)
+				read -p "  请设置机器人 角 色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_robots_allow_net 
+			;;
+		esac	
+	done
+	
+
 	echo
 
 	read -p "10. 是否配置管理端口?[Yy/Nn]? " setup_management
@@ -1019,28 +1039,115 @@ crl-verify crl.pem" >>$INSTALL_DIR/server/server.conf
 			iptables_path=$(command -v iptables-legacy)
 			ip6tables_path=$(command -v ip6tables-legacy)
 		fi
+	
 		echo "  正在生成OpenVPN的iptables规则"
 		echo "[Unit]
 Before=network.target
+
 [Service]
 Type=oneshot
 ExecStart=$iptables_path -I INPUT -p $protocol --dport $port -j ACCEPT
-ExecStart=$iptables_path -I FORWARD -s $server_ip_net/24 -j ACCEPT
-ExecStart=$iptables_path -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
 ExecStop=$iptables_path -D INPUT -p $protocol --dport $port -j ACCEPT
-ExecStop=$iptables_path -D FORWARD -s $server_ip_net/24 -j ACCEPT
-ExecStop=$iptables_path -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT" >/etc/systemd/system/openvpn-iptables.service
 
-		if [[ "$setup_client_conn_server_net" =~ ^[yY]$ ]]; then
-			echo "ExecStart=$iptables_path -t nat -A POSTROUTING -s $server_ip_net/24 -d $server_ip_local_net_with_cdr -j SNAT --to $ip" >>/etc/systemd/system/openvpn-iptables.service
-			echo "ExecStop=$iptables_path -t nat -D POSTROUTING -s $server_ip_net/24 -d $server_ip_local_net_with_cdr -j SNAT --to $ip" >>/etc/systemd/system/openvpn-iptables.service
+ExecStart=$iptables_path -I FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
+ExecStop=$iptables_path -D FORWARD -m state --state RELATED,ESTABLISHED -j ACCEPT
+
+RemainAfterExit=yes
+[Install]
+WantedBy=multi-user.target
+		" >>/etc/systemd/system/openvpn-iptables.service
+		systemctl enable --now openvpn-iptables.service >/dev/null 2>&1
+
+		if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $server_subnet_developer_ip_pool ]] ;then
+			echo "[Unit]
+Before=network.target
+
+[Service]
+Type=oneshot
+ExecStart=$iptables_path  -I FORWARD -s $server_subnet_developer_ip_pool/24 -j ACCEPT
+ExecStop=$iptables_path -D FORWARD -s $server_subnet_developer_ip_pool/24 -j ACCEPT
+# ============================开发人员放行网段============================" >>/etc/systemd/system/openvpn-iptables-developer.service
+			if [[ ! -z $client_role_developer_allow_net ]]; then
+				for i in ${client_role_developer_allow_net//,/ };do
+					echo -e "ExecStart=$iptables_path -t nat -I POSTROUTING -s $server_subnet_developer_ip_pool/24 -d $i/24 -j SNAT --to $ip\nExecStop=$iptables_path -t nat -D POSTROUTING -s $server_subnet_developer_ip_pool/24 -d $i/24 -j SNAT --to $ip\n" >>/etc/systemd/system/openvpn-iptables-developer.service
+				done
+			fi
+			echo -e "RemainAfterExit=yes\n[Install]\nWantedBy=multi-user.target" >>/etc/systemd/system/openvpn-iptables-developer.service
+			systemctl enable --now openvpn-iptables-developer.service >/dev/null 2>&1
 		fi
 
-		echo "RemainAfterExit=yes
-[Install]
-WantedBy=multi-user.target" >>/etc/systemd/system/openvpn-iptables.service
-		echo "  正在生效OpenVPN的iptables规则"
-		systemctl enable --now openvpn-iptables.service >/dev/null 2>&1
+		if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $server_subnet_tester_ip_pool ]] ;then
+			echo "[Unit]
+Before=network.target
+
+[Service]
+Type=oneshot
+ExecStart=$iptables_path  -I FORWARD -s $server_subnet_tester_ip_pool/24 -j ACCEPT
+ExecStop=$iptables_path -D FORWARD -s $server_subnet_tester_ip_pool/24 -j ACCEPT
+# ============================测试人员放行网段============================" >>/etc/systemd/system/openvpn-iptables-tester.service
+			if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $client_role_tester_allow_net ]]; then
+				for i in ${client_role_tester_allow_net//,/ };do
+					echo -e "ExecStart=$iptables_path -t nat -I POSTROUTING -s $server_subnet_tester_ip_pool/24 -d $i/24 -j SNAT --to $ip\nExecStop=$iptables_path -t nat -D POSTROUTING -s $client_role_tester_allow_net/24 -d $i/24 -j SNAT --to $ip\n" >>/etc/systemd/system/openvpn-iptables-tester.service
+				done
+			fi
+			echo -e "RemainAfterExit=yes\n[Install]\nWantedBy=multi-user.target" >>/etc/systemd/system/openvpn-iptables-tester.service
+			systemctl enable --now openvpn-iptables-tester.service >/dev/null 2>&1
+		fi
+
+		if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $server_subnet_manager_ip_pool ]] ;then
+			echo "[Unit]
+Before=network.target
+
+[Service]
+Type=oneshot
+ExecStart=$iptables_path  -I FORWARD -s $server_subnet_manager_ip_pool/24 -j ACCEPT
+ExecStop=$iptables_path -D FORWARD -s $server_subnet_manager_ip_pool/24 -j ACCEPT
+# ============================运维人员放行网段============================" >>/etc/systemd/system/openvpn-iptables-manager.service
+			if [[ "$setup_client_conn_server_net" =~ ^[yY]$ &&  ! -z $client_role_manager_allow_net ]]; then
+				for i in ${client_role_manager_allow_net//,/ };do
+					echo -e "ExecStart=$iptables_path -t nat -I POSTROUTING -s $server_subnet_manager_ip_pool/24 -d $i/24 -j SNAT --to $ip\nExecStop=$iptables_path -t nat -D POSTROUTING -s $server_subnet_manager_ip_pool/24 -d $i/24 -j SNAT --to $ip\n" >>/etc/systemd/system/openvpn-iptables-manager.service
+				done
+			fi
+			echo -e "RemainAfterExit=yes\n[Install]\nWantedBy=multi-user.target" >>/etc/systemd/system/openvpn-iptables-manager.service
+			systemctl enable --now openvpn-iptables-manager.service >/dev/null 2>&1
+		fi
+
+		if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $server_subnet_bussiness_ip_pool ]] ;then
+			echo "[Unit]
+Before=network.target
+
+[Service]
+Type=oneshot
+ExecStart=$iptables_path  -I FORWARD -s $server_subnet_bussiness_ip_pool/24 -j ACCEPT
+ExecStop=$iptables_path -D FORWARD -s $server_subnet_bussiness_ip_pool/24 -j ACCEPT
+# ============================业务人员放行网段============================" >>/etc/systemd/system/openvpn-iptables-bussiness.service
+			if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $client_role_bussiness_allow_net ]]; then
+				for i in ${client_role_bussiness_allow_net//,/ };do
+					echo -e "ExecStart=$iptables_path -t nat -I POSTROUTING -s $server_subnet_bussiness_ip_pool/24 -d $i/24 -j SNAT --to $ip\nExecStop=$iptables_path -t nat -D POSTROUTING -s $server_subnet_bussiness_ip_pool/24 -d $i/24 -j SNAT --to $ip\n" >>/etc/systemd/system/openvpn-iptables-bussiness.service
+				done
+			fi
+			echo -e "RemainAfterExit=yes\n[Install]\nWantedBy=multi-user.target" >>/etc/systemd/system/openvpn-iptables-bussiness.service
+			systemctl enable --now openvpn-iptables-bussiness.service >/dev/null 2>&1
+		fi
+		if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $server_subnet_robots_ip_pool ]] ;then
+			echo "[Unit]
+Before=network.target
+
+[Service]
+Type=oneshot
+ExecStart=$iptables_path  -I FORWARD -s $server_subnet_robots_ip_pool/24 -j ACCEPT
+ExecStop=$iptables_path -D FORWARD -s $server_subnet_robots_ip_pool/24 -j ACCEPT
+# ============================机器人放行网段============================" >>/etc/systemd/system/openvpn-iptables-robots.service
+
+			if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $client_role_robots_allow_net ]]; then
+				for i in ${client_role_robots_allow_net//,/ };do
+					echo -e "ExecStart=$iptables_path -t nat -I POSTROUTING -s $server_subnet_robots_ip_pool/24 -d $i/24 -j SNAT --to $ip\nExecStop=$iptables_path -t nat -D POSTROUTING -s $server_subnet_robots_ip_pool/24 -d $i/24 -j SNAT --to $ip\n" >>/etc/systemd/system/openvpn-iptables-robots.service
+				done
+			fi
+			echo -e "RemainAfterExit=yes\n[Install]\nWantedBy=multi-user.target" >>/etc/systemd/system/openvpn-iptables-robots.service
+			systemctl enable --now openvpn-iptables-robots.service >/dev/null 2>&1
+		fi
+
 	fi
 	# If SELinux is enabled and a custom port was selected, we need this
 	if sestatus 2>/dev/null | grep "Current mode" | grep -q "enforcing" && [[ "$port" != 1194 ]]; then
