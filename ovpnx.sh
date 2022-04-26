@@ -375,7 +375,7 @@ new_client() {
 				cat $INSTALL_DIR/server/easy-rsa/pki/private/"$client".key
 				echo "</key>"
 				echo "<tls-crypt>"
-				sed -ne '/BEGIN OpenVPN Static key/,$ p' $INSTALL_DIR/server/tc.key
+				sed -ne '/BEGIN OpenVPN Static key/,$ p' $INSTALL_DIR/server/pki/tc.key
 				echo "</tls-crypt>"
 			} >$INSTALL_DIR/client/profiles/"$client".ovpn
 			client_random_password=$(echo $(date +%s)$RANDOM | md5sum | head -c 15)
@@ -402,7 +402,7 @@ new_client() {
 				cat $INSTALL_DIR/server/easy-rsa/pki/private/"$client".key
 				echo "</key>"
 				echo "<tls-crypt>"
-				sed -ne '/BEGIN OpenVPN Static key/,$ p' $INSTALL_DIR/server/tc.key
+				sed -ne '/BEGIN OpenVPN Static key/,$ p' $INSTALL_DIR/server/pki/tc.key
 				echo "</tls-crypt>"
 			} >$INSTALL_DIR/client/profiles/"$client".ovpn
 			client_random_password=$(echo $(date +%s)$RANDOM | md5sum | head -c 15)
@@ -429,7 +429,7 @@ new_client() {
 				cat $INSTALL_DIR/server/easy-rsa/pki/private/"$client".key
 				echo "</key>"
 				echo "<tls-crypt>"
-				sed -ne '/BEGIN OpenVPN Static key/,$ p' $INSTALL_DIR/server/tc.key
+				sed -ne '/BEGIN OpenVPN Static key/,$ p' $INSTALL_DIR/server/pki/tc.key
 				echo "</tls-crypt>"
 			} >$INSTALL_DIR/client/profiles/"$client".ovpn
 			client_random_password=$(echo $(date +%s)$RANDOM | md5sum | head -c 15)
@@ -456,7 +456,7 @@ new_client() {
 				cat $INSTALL_DIR/server/easy-rsa/pki/private/"$client".key
 				echo "</key>"
 				echo "<tls-crypt>"
-				sed -ne '/BEGIN OpenVPN Static key/,$ p' $INSTALL_DIR/server/tc.key
+				sed -ne '/BEGIN OpenVPN Static key/,$ p' $INSTALL_DIR/server/pki/tc.key
 				echo "</tls-crypt>"
 			} >$INSTALL_DIR/client/profiles/"$client".ovpn
 			client_random_password=$(echo $(date +%s)$RANDOM | md5sum | head -c 15)
@@ -638,7 +638,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 				1)
 					read -e -p "  请设置开发人员角色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_developer_ip_pool
 					until [[ -z "$server_subnet_developer_ip_pool" || $server_subnet_developer_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
-						read -p "  $server_subnet_developer_ip_pool不属于$server_ip_net下的子网段，请重新设置开发人员角色IP地址网段: " server_subnet_developer_ip_pool
+						read -e -p "  $server_subnet_developer_ip_pool不属于$server_ip_net下的子网段，请重新设置开发人员角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_developer_ip_pool
 					done
 				;;
 				2)
@@ -646,7 +646,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 					until [[ -z "$server_subnet_tester_ip_pool" || ! $server_subnet_tester_ip_pool == $server_subnet_developer_ip_pool ]];do
 						read -p "  $server_subnet_tester_ip_pool网段已被占用，请重新设置测试人员角色IP地址网段：" server_subnet_tester_ip_pool
 						until [[ $server_subnet_tester_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
-							read -p "  $server_subnet_tester_ip_pool不属于$server_ip_net下的子网段，请重新设置测试人员角色IP地址网段: " server_subnet_tester_ip_pool
+							read -e -p "  $server_subnet_tester_ip_pool不属于$server_ip_net下的子网段，请重新设置测试人员角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_tester_ip_pool
 						done
 					done
 				;;
@@ -655,7 +655,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 					until [[ -z "$server_subnet_manager_ip_pool" || ! $server_subnet_manager_ip_pool == $server_subnet_developer_ip_pool && ! $server_subnet_manager_ip_pool == $server_subnet_tester_ip_pool ]]; do
 						read -p "  $server_subnet_manager_ip_pool网段已被占用，请重新设置运维人员角色IP地址网段：" server_subnet_manager_ip_pool
 						until [[ $server_subnet_manager_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
-							read -p "  $server_subnet_manager_ip_pool不属于$server_ip_net下的子网段，请重新设置运维人员角色IP地址网段: " server_subnet_manager_ip_pool
+							read -e -p "  $server_subnet_manager_ip_pool不属于$server_ip_net下的子网段，请重新设置运维人员角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_manager_ip_pool
 						done
 					done
 				;;
@@ -665,7 +665,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 					until [[ -z "$server_subnet_bussiness_ip_pool" || ! $server_subnet_bussiness_ip_pool == $server_subnet_developer_ip_pool && ! $server_subnet_bussiness_ip_pool == $server_subnet_tester_ip_pool && ! $server_subnet_bussiness_ip_pool == $server_subnet_manager_ip_pool ]]; do
 						read -p "  $server_subnet_bussiness_ip_pool网段已被占用，请重新设置业务人员角色IP地址网段：" server_subnet_bussiness_ip_pool
 						until [[ $server_subnet_bussiness_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
-							read -p "  $server_subnet_bussiness_ip_pool不属于$server_ip_net下的子网段，请重新设置业务人员角色IP地址网段: " server_subnet_bussiness_ip_pool
+							read -e -p "  $server_subnet_bussiness_ip_pool不属于$server_ip_net下的子网段，请重新设置业务人员角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_bussiness_ip_pool
 						done
 					done
 				;;
@@ -675,7 +675,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 					until [[ -z "$server_subnet_robots_ip_pool" || ! $server_subnet_robots_ip_pool == $server_subnet_developer_ip_pool && ! $server_subnet_robots_ip_pool == $server_subnet_tester_ip_pool && ! $server_subnet_robots_ip_pool == $server_subnet_manager_ip_pool && ! $server_subnet_robots_ip_pool == $server_subnet_bussiness_ip_pool ]]; do
 						read -p "  $server_subnet_robots_ip_pool网段已被占用，请重新设置机器人角色IP地址网段：" server_subnet_robots_ip_pool
 						until [[ $server_subnet_robots_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
-							read -p "  $server_subnet_robots_ip_pool不属于$server_ip_net下的子网段，请重新设置机器人角色IP地址网段: " server_subnet_robots_ip_pool
+							read -e -p "  $server_subnet_robots_ip_pool不属于$server_ip_net下的子网段，请重新设置机器人角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_robots_ip_pool
 						done
 					done				
 				;;
@@ -833,7 +833,7 @@ LimitNPROC=infinity" >/etc/systemd/system/openvpn-server@server.service.d/disabl
 	fi
 	# 下载安装证书工具easy-rsa
 	easy_rsa_url='https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.7/EasyRSA-3.0.7.tgz'
-	mkdir -p $INSTALL_DIR/server/{easy-rsa,ccd,logs,ip-pools} $INSTALL_DIR/client/profiles
+	mkdir -p $INSTALL_DIR/server/{easy-rsa,ccd,logs,ip-pools,pki} $INSTALL_DIR/client/profiles
 	
 	echo "  正在下载easy-rsa证书工具"
 	{ wget -qO- "$easy_rsa_url" 2>/dev/null || curl -# -sL "$easy_rsa_url"; } | tar xz -C $INSTALL_DIR/server/easy-rsa/ --strip-components 1
@@ -863,13 +863,13 @@ LimitNPROC=infinity" >/etc/systemd/system/openvpn-server@server.service.d/disabl
 	# EASYRSA_CERT_EXPIRE=3650 ./easyrsa build-client-full "$client" nopass
 	EASYRSA_CRL_DAYS=3650 ./easyrsa gen-crl >/dev/null 2>&1
 	# Move the stuff we need
-	cp pki/ca.crt pki/private/ca.key pki/issued/server.crt pki/private/server.key pki/crl.pem $INSTALL_DIR/server
+	cp pki/ca.crt pki/private/ca.key pki/issued/server.crt pki/private/server.key pki/crl.pem $INSTALL_DIR/server/pki
 	# CRL is read with each client connection, while OpenVPN is dropped to nobody
-	chown nobody:"$group_name" $INSTALL_DIR/server/crl.pem
+	chown nobody:"$group_name" $INSTALL_DIR/server/pki/crl.pem
 	# Without +x in the directory, OpenVPN can't run a stat() on the CRL file
 	chmod o+x $INSTALL_DIR/server/
 	# Generate key for tls-crypt
-	openvpn --genkey --secret $INSTALL_DIR/server/tc.key >/dev/null 2>&1
+	openvpn --genkey --secret $INSTALL_DIR/server/pki/tc.key >/dev/null 2>&1
 	# Create the DH parameters file using the predefined ffdhe2048 group
 	echo '-----BEGIN DH PARAMETERS-----
 MIIBCAKCAQEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz
@@ -878,7 +878,7 @@ MIIBCAKCAQEA//////////+t+FRYortKmq/cViAnPTzx2LnFg84tNpWp4TZBFGQz
 YdEIqUuyyOP7uWrat2DX9GgdT0Kj3jlN9K5W7edjcrsZCwenyO4KbXCeAvzhzffi
 7MA0BM0oNC9hkXL+nOmFg/+OTxIy7vKBg8P+OxtMb61zO7X8vC7CIAXFjvGDfRaD
 ssbzSibBsu/6iGtCOGEoXJf//////////wIBAg==
------END DH PARAMETERS-----' >$INSTALL_DIR/server/dh.pem
+-----END DH PARAMETERS-----' >$INSTALL_DIR/server/pki/dh.pem
 
 
 	# 生成OpenVPN服务端配置文件
@@ -988,9 +988,9 @@ crl-verify crl.pem" >>$INSTALL_DIR/server/server.conf
 		echo "explicit-exit-notify" >>$INSTALL_DIR/server/server.conf
 	fi
 
-	if [[ "$setup_client_conn_server_net" =~ ^[yY]$ ]]; then
-		echo "push \"route $server_ip_local_net $server_ip_local_netmask\"" >>$INSTALL_DIR/server/server.conf
-	fi
+	# if [[ "$setup_client_conn_server_net" =~ ^[yY]$ ]]; then
+	# 	echo "push \"route $server_ip_local_net $server_ip_local_netmask\"" >>$INSTALL_DIR/server/server.conf
+	# fi
 
 	if [[ "$setup_client_conn" =~ ^[yY]$ ]]; then
 		echo "client-to-client" >>$INSTALL_DIR/server/server.conf
@@ -1185,11 +1185,11 @@ auth-user-pass" >$INSTALL_DIR/server/client-common.txt
 	systemctl enable --now openvpn-server@server.service >/dev/null 2>&1
 	# Generates the custom client.ovpn
 	# new_client $user_email_address
-	echo "##################################################"
+	echo "########################################################"
 	echo
 	echo "OpenVPN服务安装完成！可重新运行此脚本执行添加用户等其他功能"
 	echo
-	echo "##################################################"
+	echo "########################################################"
 else
 	clear
 	echo "OpenVPN服务已安装"
@@ -1336,7 +1336,8 @@ else
 				# fi
 			else
 				systemctl disable --now openvpn-iptables.service >/dev/null 2>&1
-				rm -f /etc/systemd/system/openvpn-iptables.service
+				
+				rm -f /etc/systemd/system/openvpn-iptables*.service
 			fi
 			if sestatus 2>/dev/null | grep "Current mode" | grep -q "enforcing" && [[ "$port" != 1194 ]]; then
 				semanage port -d -t openvpn_port_t -p "$protocol" "$port"
