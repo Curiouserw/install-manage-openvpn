@@ -1,4 +1,8 @@
 #!/bin/bash
+setup_subnet_roles_nu=1,2,3,5
+setup_subnet_roles_nu=1,2,3,5
+setup_subnet_roles_nu=1,2,3,4
+setup_subnet_roles_nu=1,2,3,5
 
 # set -x
 
@@ -205,6 +209,7 @@ Content-Type: text/html; charset="utf-8"
 			echo "smtp_server_user=$smtp_server_user"
 			echo "smtp_server_passwd=$smtp_server_passwd"
 		} >$INSTALL_DIR/server/smtp.conf
+		echo
 		echo "已通过SMTP服务器发送测试邮件。SMTP服务器设置成功！如需重新配置请直接修改$INSTALL_DIR/server/smtp.conf或删除后重新运行该脚本进行配置]"
 		echo
 	else
@@ -328,148 +333,58 @@ Content-Disposition: attachment; filename=\"OpenVPN-MacOS.ovpn\"
 	fi
 }
 
-# $1参数是角色名称，可选“developer、tester、bussiness、manager、robots”。
-# $2参数是角色的IP地址网络段，格式例如：10.11.12。
-genMultiRoleSubnetProfile(){
-	case "$1" in 
-		developer)
-			seq -f "$2.%g" 2 254 > $INSTALL_DIR/server/ip-pools/developer-ip-pools
-			touch $INSTALL_DIR/client/clientsinfo-developer
-		;;
-		tester)
-			seq -f "$2.%g" 2 254 > $INSTALL_DIR/server/ip-pools/tester-ip-pools
-			touch $INSTALL_DIR/client/clientsinfo-tester
-		;;
-		business)
-			seq -f "$2.%g" 2 254 > $INSTALL_DIR/server/ip-pools/business-ip-pools
-			touch $INSTALL_DIR/client/clientsinfo-business
-		;;
-		manager)
-			seq -f "$2.%g" 2 254 > $INSTALL_DIR/server/ip-pools/manager-ip-pools
-			touch $INSTALL_DIR/client/clientsinfo-manager
-		;;
-		robots)
-			seq -f "$2.%g" 2 254 > $INSTALL_DIR/server/ip-pools/robots-ip-pools
-			touch $INSTALL_DIR/client/clientsinfo-robots
-		;;
-	esac
-}
 
+new_client_profile(){
+	cd $INSTALL_DIR/server/easy-rsa/
+	EASYRSA_CERT_EXPIRE=3650 ./easyrsa build-client-full "$1" nopass
+	# Generates the custom client.ovpn
+	{
+		cat $INSTALL_DIR/server/client-common.txt
+		echo "<ca>"
+		cat $INSTALL_DIR/server/easy-rsa/pki/ca.crt
+		echo "</ca>"
+		echo "<cert>"
+		sed -ne '/BEGIN CERTIFICATE/,$ p' $INSTALL_DIR/server/easy-rsa/pki/issued/"$1".crt
+		echo "</cert>"
+		echo "<key>"
+		cat $INSTALL_DIR/server/easy-rsa/pki/private/"$1".key
+		echo "</key>"
+		echo "<tls-crypt>"
+		sed -ne '/BEGIN OpenVPN Static key/,$ p' $INSTALL_DIR/server/pki/tc.key
+		echo "</tls-crypt>"
+	} >$INSTALL_DIR/client/profiles/"$1".ovpn
+	client_random_password=$(echo $(date +%s)$RANDOM | md5sum | head -c 15)
+	echo "$1 $client_random_password" >>$INSTALL_DIR/server/psw-file
+	if [[ ! -f $INSTALL_DIR/server/ccd/$1 ]]; then
+		cleint_ip=$(head -n 1 $INSTALL_DIR/server/ip-pools/$2-ip-pools)
+		echo "ifconfig-push $cleint_ip 255.255.255.0" >>$INSTALL_DIR/server/ccd/$1
+		sed -i "/\<$cleint_ip\>/d" $INSTALL_DIR/server/ip-pools/$2-ip-pools
+	fi
+	echo "$2 $1" >> $INSTALL_DIR/client/clients-info
+}
 new_client() {
 	check_smtp_server_profile
 	if [ $? -eq 0 ]; then
-		case "$client_role" in
-		developer)
-			cd $INSTALL_DIR/server/easy-rsa/
-			EASYRSA_CERT_EXPIRE=3650 ./easyrsa build-client-full "$client" nopass
-			# Generates the custom client.ovpn
-			{
-				cat $INSTALL_DIR/server/client-common.txt
-				echo "<ca>"
-				cat $INSTALL_DIR/server/easy-rsa/pki/ca.crt
-				echo "</ca>"
-				echo "<cert>"
-				sed -ne '/BEGIN CERTIFICATE/,$ p' $INSTALL_DIR/server/easy-rsa/pki/issued/"$client".crt
-				echo "</cert>"
-				echo "<key>"
-				cat $INSTALL_DIR/server/easy-rsa/pki/private/"$client".key
-				echo "</key>"
-				echo "<tls-crypt>"
-				sed -ne '/BEGIN OpenVPN Static key/,$ p' $INSTALL_DIR/server/pki/tc.key
-				echo "</tls-crypt>"
-			} >$INSTALL_DIR/client/profiles/"$client".ovpn
-			client_random_password=$(echo $(date +%s)$RANDOM | md5sum | head -c 15)
-			echo "$client $client_random_password" >>$INSTALL_DIR/server/psw-file
-			if [[ ! -f $INSTALL_DIR/server/ccd/$client ]]; then
-				cleint_ip=$(head -n 1 $INSTALL_DIR/server/ip-pools/$client_role-ip-pools)
-				echo "ifconfig-push $cleint_ip 255.255.255.0" >>$INSTALL_DIR/server/ccd/$client
-				sed -i "/\<$cleint_ip\>/d" $INSTALL_DIR/server/ip-pools/$client_role-ip-pools
-			fi
+		case "$2" in
+		1)
+			new_client_profile $1 developer
+		;;
+		2)
+			new_client_profile $1 tester
 			;;
-		tester)
-			cd $INSTALL_DIR/server/easy-rsa/
-			EASYRSA_CERT_EXPIRE=3650 ./easyrsa build-client-full "$client" nopass
-			# Generates the custom client.ovpn
-			{
-				cat $INSTALL_DIR/server/client-common.txt
-				echo "<ca>"
-				cat $INSTALL_DIR/server/easy-rsa/pki/ca.crt
-				echo "</ca>"
-				echo "<cert>"
-				sed -ne '/BEGIN CERTIFICATE/,$ p' $INSTALL_DIR/server/easy-rsa/pki/issued/"$client".crt
-				echo "</cert>"
-				echo "<key>"
-				cat $INSTALL_DIR/server/easy-rsa/pki/private/"$client".key
-				echo "</key>"
-				echo "<tls-crypt>"
-				sed -ne '/BEGIN OpenVPN Static key/,$ p' $INSTALL_DIR/server/pki/tc.key
-				echo "</tls-crypt>"
-			} >$INSTALL_DIR/client/profiles/"$client".ovpn
-			client_random_password=$(echo $(date +%s)$RANDOM | md5sum | head -c 15)
-			echo "$client $client_random_password" >>$INSTALL_DIR/server/psw-file
-			if [[ ! -f $INSTALL_DIR/server/ccd/$client ]]; then
-				cleint_ip=$(head -n 1 $INSTALL_DIR/server/ip-pools/$client_role-ip-pools)
-				echo "ifconfig-push $cleint_ip 255.255.255.0" >>$INSTALL_DIR/server/ccd/$client
-				sed -i "/\<$cleint_ip\>/d" $INSTALL_DIR/server/ip-pools/$client_role-ip-pools
-			fi
+		3)
+			new_client_profile $1 manager
 			;;
-		business)
-			cd $INSTALL_DIR/server/easy-rsa/
-			EASYRSA_CERT_EXPIRE=3650 ./easyrsa build-client-full "$client" nopass
-			# Generates the custom client.ovpn
-			{
-				cat $INSTALL_DIR/server/client-common.txt
-				echo "<ca>"
-				cat $INSTALL_DIR/server/easy-rsa/pki/ca.crt
-				echo "</ca>"
-				echo "<cert>"
-				sed -ne '/BEGIN CERTIFICATE/,$ p' $INSTALL_DIR/server/easy-rsa/pki/issued/"$client".crt
-				echo "</cert>"
-				echo "<key>"
-				cat $INSTALL_DIR/server/easy-rsa/pki/private/"$client".key
-				echo "</key>"
-				echo "<tls-crypt>"
-				sed -ne '/BEGIN OpenVPN Static key/,$ p' $INSTALL_DIR/server/pki/tc.key
-				echo "</tls-crypt>"
-			} >$INSTALL_DIR/client/profiles/"$client".ovpn
-			client_random_password=$(echo $(date +%s)$RANDOM | md5sum | head -c 15)
-			echo "$client $client_random_password" >>$INSTALL_DIR/server/psw-file
-			if [[ ! -f $INSTALL_DIR/server/ccd/$client ]]; then
-				cleint_ip=$(head -n 1 $INSTALL_DIR/server/ip-pools/$client_role-ip-pools)
-				echo "ifconfig-push $cleint_ip 255.255.255.0" >>$INSTALL_DIR/server/ccd/$client
-				sed -i "/\<$cleint_ip\>/d" $INSTALL_DIR/server/ip-pools/$client_role-ip-pools
-			fi
+		4)
+			new_client_profile $1 bussiness
 			;;
-		manager)
-			cd $INSTALL_DIR/server/easy-rsa/
-			EASYRSA_CERT_EXPIRE=3650 ./easyrsa build-client-full "$client" nopass
-			# Generates the custom client.ovpn
-			{
-				cat $INSTALL_DIR/server/client-common.txt
-				echo "<ca>"
-				cat $INSTALL_DIR/server/easy-rsa/pki/ca.crt
-				echo "</ca>"
-				echo "<cert>"
-				sed -ne '/BEGIN CERTIFICATE/,$ p' $INSTALL_DIR/server/easy-rsa/pki/issued/"$client".crt
-				echo "</cert>"
-				echo "<key>"
-				cat $INSTALL_DIR/server/easy-rsa/pki/private/"$client".key
-				echo "</key>"
-				echo "<tls-crypt>"
-				sed -ne '/BEGIN OpenVPN Static key/,$ p' $INSTALL_DIR/server/pki/tc.key
-				echo "</tls-crypt>"
-			} >$INSTALL_DIR/client/profiles/"$client".ovpn
-			client_random_password=$(echo $(date +%s)$RANDOM | md5sum | head -c 15)
-			echo "$client $client_random_password" >>$INSTALL_DIR/server/psw-file
-			if [[ ! -f $INSTALL_DIR/server/ccd/$client ]]; then
-				cleint_ip=$(head -n 1 $INSTALL_DIR/server/ip-pools/$client_role-ip-pools)
-				echo "ifconfig-push $cleint_ip 255.255.255.0" >>$INSTALL_DIR/server/ccd/$client
-				sed -i "/\<$cleint_ip\>/d" $INSTALL_DIR/server/ip-pools/$client_role-ip-pools
-			fi
+		5)
+			new_client_profile $1 robots
 			;;
 		esac
 
-		send_email $1 $client $client_random_password $INSTALL_DIR/client/profiles/$client.ovpn
+		send_email $3 $1 $client_random_password $INSTALL_DIR/client/profiles/$1.ovpn
+		
 	fi
 }
 
@@ -499,12 +414,12 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 	if [[ $(ip -4 addr | grep inet | grep -vEc '127(\.[0-9]{1,3}){3}') -eq 1 ]]; then
 		ip=$(ip -4 addr | grep inet | grep -vE '127(\.[0-9]{1,3}){3}' | cut -d '/' -f 1 | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}')
 	else
-		number_of_ip=$(ip -4 addr | grep inet | grep -vEc '127(\.[0-9]{1,3}){3}')
+		display_mber_of_ip=$(ip -4 addr | grep inet | grep -vEc '127(\.[0-9]{1,3}){3}')
 		echo
 		echo "1. OpenVPN服务端监听在以下哪个IPv4地址上?"
 		ip -4 addr | grep inet | grep -vE '127(\.[0-9]{1,3}){3}' | cut -d '/' -f 1 | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}' | nl -s ') '
-		read -p "IPv4地址，默认[1]: " ip_number
-		until [[ -z "$ip_number" || "$ip_number" =~ ^[0-9]+$ && "$ip_number" -le "$number_of_ip" ]]; do
+		read -p "IPv4地址，默认[1]: " ip_display_mber
+		until [[ -z "$ip_display_mber" || "$ip_display_mber" =~ ^[0-9]+$ && "$ip_number" -le "$number_of_ip" ]]; do
 			echo "$ip_number: 无效的选项."
 			read -p "IPv4地址[1]: " ip_number
 		done
@@ -633,6 +548,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 		if [[ $server_ip_subnet_roles == 6 ]];then
 			server_ip_subnet_roles=1,2,3,4,5
 		fi
+		sed -i -e "1a setup_subnet_roles_nu\=$server_ip_subnet_roles" $0
 		for i in ${server_ip_subnet_roles//,/ };do
 			case $i in
 				1)
@@ -711,17 +627,6 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 
 	esac
 
-	# echo "配置推送给客户端使用的DNS服务器"
-	# echo "   1) 114 DNS"
-	# echo "   2) 阿里云DNS"
-	# echo "   3) 谷歌DNS"
-	# echo "   4) 当前系统配置的DNS"
-	# read -p "默认DNS服务器[1]: " dns
-	# until [[ -z "$dns" || "$dns" =~ ^[1-4]$ ]]; do
-	# 	echo "$dns: 无效的选项."
-	# 	read -p "默认DNS服务器[1]: " dns
-	# done
-
 	echo
 
 	read -p "8. 是否允许客户端间互联[Yy/Nn]? " setup_client_conn
@@ -779,11 +684,10 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 		[[ -z "$management_port" ]] && management_port=27506
 
 		read -p $'  设置管理端口登录密码(默认生产15位随机0-9a-zA-Z字符串密码): ' management_psw
-		until [[ -z "$management_psw" || ${management_psw} =~ ^[0-9a-zA-Z]{6,15}$ ]]; do
+		until [[ -z "$management_psw" || ${management_psw} =~ ^[0-9a-zA-Z]{15}$ ]]; do
 			read -s -p "  设置的密码过于简单，请重新设置更为复杂的密码: " management_psw
 		done
 		[[ -z "$management_psw" ]] && management_psw=$(echo $(date +%s)$RANDOM | md5sum | base64 | head -c 15)
-		echo "  密码保存在了$INSTALL_DIR/server/management-psw-file文件中，更多管理端口的使用方法详见:https://openvpn.net/community-resources/management-interface"
 		;;
 	n | N) ;;
 
@@ -840,19 +744,19 @@ LimitNPROC=infinity" >/etc/systemd/system/openvpn-server@server.service.d/disabl
 	chown -R root:root $INSTALL_DIR/server
 	
 	if [[ ! -z "$server_subnet_developer_ip_pool" ]]; then
-		genMultiRoleSubnetProfile developer ${server_subnet_developer_ip_pool%.*}
+		seq -f "${server_subnet_developer_ip_pool%.*}.%g" 2 254 > $INSTALL_DIR/server/ip-pools/developer-ip-pools
 	fi
 	if [[ ! -z "$server_subnet_tester_ip_pool" ]]; then
-		genMultiRoleSubnetProfile tester ${server_subnet_tester_ip_pool%.*}
+		seq -f "${server_subnet_tester_ip_pool%.*}.%g" 2 254 > $INSTALL_DIR/server/ip-pools/tester-ip-pools
 	fi
 	if  [[ ! -z "$server_subnet_manager_ip_pool" ]]; then
-		genMultiRoleSubnetProfile manager ${server_subnet_manager_ip_pool%.*}
+		seq -f "${server_subnet_manager_ip_pool%.*}.%g" 2 254 > $INSTALL_DIR/server/ip-pools/manager-ip-pools
 	fi
 	if  [[ ! -z "$server_subnet_bussiness_ip_pool" ]]; then
-		genMultiRoleSubnetProfile bussiness ${server_subnet_bussiness_ip_pool%.*}
+		seq -f "${server_subnet_bussiness_ip_pool%.*}.%g" 2 254 > $INSTALL_DIR/server/ip-pools/bussiness-ip-pools
 	fi
 	if  [[ ! -z "$server_subnet_robots_ip_pool" ]]; then
-		genMultiRoleSubnetProfile robots ${server_subnet_robots_ip_pool%.*}
+		seq -f "${server_subnet_robots_ip_pool%.*}.%g" 2 254 > $INSTALL_DIR/server/ip-pools/robots-ip-pools
 	fi
 	# 创建CA和客户端证书
 	cd $INSTALL_DIR/server/easy-rsa/
@@ -887,12 +791,12 @@ ssbzSibBsu/6iGtCOGEoXJf//////////wIBAg==
 port $port
 proto $protocol
 dev tun
-ca ca.crt
-cert server.crt
-key server.key
-dh dh.pem
+ca pki/ca.crt
+cert pki/server.crt
+key pki/server.key
+dh pki/dh.pem
 auth SHA512
-tls-crypt tc.key
+tls-crypt pki/tc.key
 topology subnet
 mute 30
 auth-user-pass-verify openvpn-utils.sh via-env
@@ -1183,11 +1087,10 @@ auth-user-pass" >$INSTALL_DIR/server/client-common.txt
 	# Enable and start the OpenVPN service
 	echo "  正在启动OpenVPN服务并设置开机自启"
 	systemctl enable --now openvpn-server@server.service >/dev/null 2>&1
-	# Generates the custom client.ovpn
-	# new_client $user_email_address
 	echo "########################################################"
 	echo
 	echo "OpenVPN服务安装完成！可重新运行此脚本执行添加用户等其他功能"
+	echo "管理端口密码已保存在$INSTALL_DIR/server/management-psw-file文件中，更多管理端口的使用方法详见:https://openvpn.net/community-resources/management-interface"
 	echo
 	echo "########################################################"
 else
@@ -1216,41 +1119,48 @@ else
 			read -p "$client已存在或不符合规则，请设置新的用户名: " client
 		done
 
-		echo "用户角色: "
-		echo "  1. 开发人员"
-		echo "  2. 测试人员"
-		echo "  3. 业务人员"
-		echo "  4. 运维人员"
-		echo "  5. 机器人"
-		read -p "请设置用户角色(1|2|3|4|5) ? " client_role_nu
-		until [[ -z "$client_role_nu" || "$client_role_nu" =~ ^[1|2|3|4]$ ]]; do
-			echo "$client_role_nu: 无效的选项."
-			read -p "请重新设置用户角色" client_role_nu
-		done
-		case "$client_role_nu" in
-			1)
-				client_role=developer
-			;;
-			2)
-				client_role=tester
-			;;
-			3)
-				client_role=manager
-			;;
-			4)
-				client_role=business
-			;;
-			5)
-				client_role=robots
-			;;
-		esac
+		# set -x 
+		if [[ ! -z $setup_subnet_roles_nu ]] ;then
+			echo "已配置的用户角色："
+			display_nu=1
+			for i in ${setup_subnet_roles_nu//,/ };do
+				case $i in
+					1)
+						echo "  ${display_nu}: 开发人员角色"
+						display_nu=$((display_nu+1))
+					;;
+					2)
+						echo "  ${display_nu}: 测试人员角色"
+						display_nu=$((display_nu+1))
+					;;
+					3)
+						echo "  ${display_nu}: 运维人员角色"
+						display_nu=$((display_nu+1))
+					;;
+					4)
+						echo "  ${display_nu}: 业务人员角色"
+						display_nu=$((display_nu+1))
+					;;
+					5)
+						echo "  ${display_nu}: 机器人 角 色"
+						display_nu=$((display_nu+1))
+					;;
+				esac
+			done
+		fi
 
-		read -p "设置用户邮箱: " user_email_address
+		read -p "请设置新用户角色: " new_client_role
+		until [[ -z "$new_client_role" || "$new_client_role" =~ ^[1|2|3|4]$ ]]; do
+			echo "$new_client_role: 无效的选项."
+			read -p "请重新设置新用户角色" new_client_role
+		done
+
+		read -p "设置用户邮箱: " user_email_address 
 		until [[ -z ${user_email_address+x} || ${user_email_address} =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$ ]]; do
 			read -p "${user_email_address}不是一个正确的邮箱格式，请重新设置: " user_email_address
 		done
 
-		new_client $user_email_address
+		new_client $client $new_client_role $user_email_address
 		exit
 		;;
 	2)
