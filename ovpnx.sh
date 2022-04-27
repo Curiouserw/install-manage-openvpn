@@ -1,8 +1,4 @@
 #!/bin/bash
-setup_subnet_roles_nu=1,2,3,5
-setup_subnet_roles_nu=1,2,3,5
-setup_subnet_roles_nu=1,2,3,4
-setup_subnet_roles_nu=1,2,3,5
 
 # set -x
 
@@ -797,10 +793,12 @@ key pki/server.key
 dh pki/dh.pem
 auth SHA512
 tls-crypt pki/tc.key
+crl-verify pki/crl.pem
 topology subnet
 mute 30
 auth-user-pass-verify openvpn-utils.sh via-env
 username-as-common-name
+verb 3
 script-security 3
 client-config-dir ccd
 ifconfig-pool-persist ipp.txt
@@ -885,9 +883,7 @@ persist-key
 persist-tun
 status logs/openvpn-status.log
 client-connect openvpn-utils.sh
-client-disconnect openvpn-utils.sh
-verb 3
-crl-verify crl.pem" >>$INSTALL_DIR/server/server.conf
+client-disconnect openvpn-utils.sh" >>$INSTALL_DIR/server/server.conf
 	if [[ "$protocol" = "udp" ]]; then
 		echo "explicit-exit-notify" >>$INSTALL_DIR/server/server.conf
 	fi
@@ -1089,8 +1085,8 @@ auth-user-pass" >$INSTALL_DIR/server/client-common.txt
 	systemctl enable --now openvpn-server@server.service >/dev/null 2>&1
 	echo "########################################################"
 	echo
-	echo "OpenVPN服务安装完成！可重新运行此脚本执行添加用户等其他功能"
 	echo "管理端口密码已保存在$INSTALL_DIR/server/management-psw-file文件中，更多管理端口的使用方法详见:https://openvpn.net/community-resources/management-interface"
+	echo "OpenVPN服务安装完成！可重新运行此脚本执行添加用户等其他功能"
 	echo
 	echo "########################################################"
 else
@@ -1246,7 +1242,6 @@ else
 				# fi
 			else
 				systemctl disable --now openvpn-iptables.service >/dev/null 2>&1
-				
 				rm -f /etc/systemd/system/openvpn-iptables*.service
 			fi
 			if sestatus 2>/dev/null | grep "Current mode" | grep -q "enforcing" && [[ "$port" != 1194 ]]; then
