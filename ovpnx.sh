@@ -1,5 +1,8 @@
 #!/bin/bash
 
+#请勿删除该预制空变量，后续会赋予将安装后的用户角色编号
+setup_subnet_roles_nu=
+
 # set -x
 
 INSTALL_DIR=/etc/openvpn
@@ -544,7 +547,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 		if [[ $server_ip_subnet_roles == 6 ]];then
 			server_ip_subnet_roles=1,2,3,4,5
 		fi
-		sed -i -e "1a setup_subnet_roles_nu\=$server_ip_subnet_roles" $0
+		sed -i -e "s/^setup_subnet_roles_nu=.*/setup_subnet_roles_nu=$server_ip_subnet_roles/g" $0
 		for i in ${server_ip_subnet_roles//,/ };do
 			case $i in
 				1)
@@ -939,7 +942,7 @@ client-disconnect openvpn-utils.sh" >>$INSTALL_DIR/server/server.conf
 			iptables_path=$(command -v iptables-legacy)
 			ip6tables_path=$(command -v ip6tables-legacy)
 		fi
-	
+		set -x
 		echo "  正在生成OpenVPN的iptables规则"
 		echo "[Unit]
 Before=network.target
@@ -969,11 +972,11 @@ ExecStop=$iptables_path -D FORWARD -s $server_subnet_developer_ip_pool/24 -j ACC
 # ============================开发人员放行网段============================" >>/etc/systemd/system/openvpn-iptables-developer.service
 			if [[ ! -z $client_role_developer_allow_net ]]; then
 				for i in ${client_role_developer_allow_net//,/ };do
-					echo -e "ExecStart=$iptables_path -t nat -I POSTROUTING -s $server_subnet_developer_ip_pool/24 -d $i/24 -j SNAT --to $ip\nExecStop=$iptables_path -t nat -D POSTROUTING -s $server_subnet_developer_ip_pool/24 -d $i/24 -j SNAT --to $ip\n" >>/etc/systemd/system/openvpn-iptables-developer.service
+					echo -e "ExecStart=$iptables_path -t nat -I POSTROUTING -s $server_subnet_developer_ip_pool/24 -d $i -j SNAT --to $ip\nExecStop=$iptables_path -t nat -D POSTROUTING -s $server_subnet_developer_ip_pool/24 -d $i -j SNAT --to $ip\n" >>/etc/systemd/system/openvpn-iptables-developer.service
 				done
 			fi
 			echo -e "RemainAfterExit=yes\n[Install]\nWantedBy=multi-user.target" >>/etc/systemd/system/openvpn-iptables-developer.service
-			systemctl enable --now openvpn-iptables-developer.service >/dev/null 2>&1
+			systemctl enable --now openvpn-iptables-developer.service
 		fi
 
 		if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $server_subnet_tester_ip_pool ]] ;then
@@ -987,11 +990,11 @@ ExecStop=$iptables_path -D FORWARD -s $server_subnet_tester_ip_pool/24 -j ACCEPT
 # ============================测试人员放行网段============================" >>/etc/systemd/system/openvpn-iptables-tester.service
 			if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $client_role_tester_allow_net ]]; then
 				for i in ${client_role_tester_allow_net//,/ };do
-					echo -e "ExecStart=$iptables_path -t nat -I POSTROUTING -s $server_subnet_tester_ip_pool/24 -d $i/24 -j SNAT --to $ip\nExecStop=$iptables_path -t nat -D POSTROUTING -s $client_role_tester_allow_net/24 -d $i/24 -j SNAT --to $ip\n" >>/etc/systemd/system/openvpn-iptables-tester.service
+					echo -e "ExecStart=$iptables_path -t nat -I POSTROUTING -s $server_subnet_tester_ip_pool/24 -d $i -j SNAT --to $ip\nExecStop=$iptables_path -t nat -D POSTROUTING -s $server_subnet_tester_ip_pool/24 -d $i -j SNAT --to $ip\n" >>/etc/systemd/system/openvpn-iptables-tester.service
 				done
 			fi
 			echo -e "RemainAfterExit=yes\n[Install]\nWantedBy=multi-user.target" >>/etc/systemd/system/openvpn-iptables-tester.service
-			systemctl enable --now openvpn-iptables-tester.service >/dev/null 2>&1
+			systemctl enable --now openvpn-iptables-tester.service
 		fi
 
 		if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $server_subnet_manager_ip_pool ]] ;then
@@ -1005,11 +1008,11 @@ ExecStop=$iptables_path -D FORWARD -s $server_subnet_manager_ip_pool/24 -j ACCEP
 # ============================运维人员放行网段============================" >>/etc/systemd/system/openvpn-iptables-manager.service
 			if [[ "$setup_client_conn_server_net" =~ ^[yY]$ &&  ! -z $client_role_manager_allow_net ]]; then
 				for i in ${client_role_manager_allow_net//,/ };do
-					echo -e "ExecStart=$iptables_path -t nat -I POSTROUTING -s $server_subnet_manager_ip_pool/24 -d $i/24 -j SNAT --to $ip\nExecStop=$iptables_path -t nat -D POSTROUTING -s $server_subnet_manager_ip_pool/24 -d $i/24 -j SNAT --to $ip\n" >>/etc/systemd/system/openvpn-iptables-manager.service
+					echo -e "ExecStart=$iptables_path -t nat -I POSTROUTING -s $server_subnet_manager_ip_pool/24 -d $i -j SNAT --to $ip\nExecStop=$iptables_path -t nat -D POSTROUTING -s $server_subnet_manager_ip_pool/24 -d $i -j SNAT --to $ip\n" >>/etc/systemd/system/openvpn-iptables-manager.service
 				done
 			fi
 			echo -e "RemainAfterExit=yes\n[Install]\nWantedBy=multi-user.target" >>/etc/systemd/system/openvpn-iptables-manager.service
-			systemctl enable --now openvpn-iptables-manager.service >/dev/null 2>&1
+			systemctl enable --now openvpn-iptables-manager.service
 		fi
 
 		if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $server_subnet_bussiness_ip_pool ]] ;then
@@ -1023,11 +1026,11 @@ ExecStop=$iptables_path -D FORWARD -s $server_subnet_bussiness_ip_pool/24 -j ACC
 # ============================业务人员放行网段============================" >>/etc/systemd/system/openvpn-iptables-bussiness.service
 			if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $client_role_bussiness_allow_net ]]; then
 				for i in ${client_role_bussiness_allow_net//,/ };do
-					echo -e "ExecStart=$iptables_path -t nat -I POSTROUTING -s $server_subnet_bussiness_ip_pool/24 -d $i/24 -j SNAT --to $ip\nExecStop=$iptables_path -t nat -D POSTROUTING -s $server_subnet_bussiness_ip_pool/24 -d $i/24 -j SNAT --to $ip\n" >>/etc/systemd/system/openvpn-iptables-bussiness.service
+					echo -e "ExecStart=$iptables_path -t nat -I POSTROUTING -s $server_subnet_bussiness_ip_pool/24 -d $i -j SNAT --to $ip\nExecStop=$iptables_path -t nat -D POSTROUTING -s $server_subnet_bussiness_ip_pool/24 -d $i -j SNAT --to $ip\n" >>/etc/systemd/system/openvpn-iptables-bussiness.service
 				done
 			fi
 			echo -e "RemainAfterExit=yes\n[Install]\nWantedBy=multi-user.target" >>/etc/systemd/system/openvpn-iptables-bussiness.service
-			systemctl enable --now openvpn-iptables-bussiness.service >/dev/null 2>&1
+			systemctl enable --now openvpn-iptables-bussiness.service
 		fi
 		if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $server_subnet_robots_ip_pool ]] ;then
 			echo "[Unit]
@@ -1041,13 +1044,13 @@ ExecStop=$iptables_path -D FORWARD -s $server_subnet_robots_ip_pool/24 -j ACCEPT
 
 			if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $client_role_robots_allow_net ]]; then
 				for i in ${client_role_robots_allow_net//,/ };do
-					echo -e "ExecStart=$iptables_path -t nat -I POSTROUTING -s $server_subnet_robots_ip_pool/24 -d $i/24 -j SNAT --to $ip\nExecStop=$iptables_path -t nat -D POSTROUTING -s $server_subnet_robots_ip_pool/24 -d $i/24 -j SNAT --to $ip\n" >>/etc/systemd/system/openvpn-iptables-robots.service
+					echo -e "ExecStart=$iptables_path -t nat -I POSTROUTING -s $server_subnet_robots_ip_pool/24 -d $i -j SNAT --to $ip\nExecStop=$iptables_path -t nat -D POSTROUTING -s $server_subnet_robots_ip_pool/24 -d $i -j SNAT --to $ip\n" >>/etc/systemd/system/openvpn-iptables-robots.service
 				done
 			fi
 			echo -e "RemainAfterExit=yes\n[Install]\nWantedBy=multi-user.target" >>/etc/systemd/system/openvpn-iptables-robots.service
-			systemctl enable --now openvpn-iptables-robots.service >/dev/null 2>&1
+			systemctl enable --now openvpn-iptables-robots.service
 		fi
-
+		set +x
 	fi
 	# If SELinux is enabled and a custom port was selected, we need this
 	if sestatus 2>/dev/null | grep "Current mode" | grep -q "enforcing" && [[ "$port" != 1194 ]]; then
@@ -1085,8 +1088,8 @@ auth-user-pass" >$INSTALL_DIR/server/client-common.txt
 	systemctl enable --now openvpn-server@server.service >/dev/null 2>&1
 	echo "########################################################"
 	echo
-	echo "管理端口密码已保存在$INSTALL_DIR/server/management-psw-file文件中，更多管理端口的使用方法详见:https://openvpn.net/community-resources/management-interface"
-	echo "OpenVPN服务安装完成！可重新运行此脚本执行添加用户等其他功能"
+	echo "1. 管理端口密码已保存在$INSTALL_DIR/server/management-psw-file文件中，更多管理端口的使用方法详见:https://openvpn.net/community-resources/management-interface"
+	echo "2. OpenVPN服务安装完成！可重新运行此脚本执行添加用户等其他功能"
 	echo
 	echo "########################################################"
 else
@@ -1115,7 +1118,6 @@ else
 			read -p "$client已存在或不符合规则，请设置新的用户名: " client
 		done
 
-		# set -x 
 		if [[ ! -z $setup_subnet_roles_nu ]] ;then
 			echo "已配置的用户角色："
 			display_nu=1
@@ -1241,14 +1243,45 @@ else
 				# 	firewall-cmd --permanent --direct --remove-rule ipv6 nat POSTROUTING 0 -s fddd:1194:1194:1194::/64 ! -d fddd:1194:1194:1194::/64 -j SNAT --to "$ip6"
 				# fi
 			else
+				
 				systemctl disable --now openvpn-iptables.service >/dev/null 2>&1
-				rm -f /etc/systemd/system/openvpn-iptables*.service
+				
 			fi
 			if sestatus 2>/dev/null | grep "Current mode" | grep -q "enforcing" && [[ "$port" != 1194 ]]; then
 				semanage port -d -t openvpn_port_t -p "$protocol" "$port"
 			fi
+
+			if [[ ! -z $setup_subnet_roles_nu ]];then
+				for i in ${setup_subnet_roles_nu//,/ };do
+					case $i in
+						1)
+							systemctl stop --now openvpn-iptables-developer@server.service
+							systemctl disable --now openvpn-iptables-developer@server.service
+						;;
+						2)
+							systemctl stop --now openvpn-iptables-tester@server.service
+							systemctl disable --now openvpn-iptables-tester@server.service
+						;;
+						3)
+							systemctl stop --now openvpn-iptables-manager@server.service
+							systemctl disable --now openvpn-iptables-manager@server.service
+						;;
+						4)
+							systemctl stop --now openvpn-iptables-bussiness@server.service
+							systemctl disable --now openvpn-iptables-bussiness@server.service
+						;;
+						5)
+							systemctl stop --now openvpn-iptables-robots@server.service
+							systemctl disable --now openvpn-iptables-robots@server.service
+						;;
+					esac
+				done
+			fi
+			
 			systemctl disable --now openvpn-server@server.service >/dev/null 2>&1
-			rm -rf $INSTALL_DIR /etc/systemd/system/openvpn-server@server.service.d/disable-limitnproc.conf /etc/sysctl.d/30-openvpn-forward.conf
+			sed -i 's/^setup_subnet_roles_nu=.*/setup_subnet_roles_nu=/g' $0
+			tar -czvf /tmp/openvpn-$(date "+%Y%m%d").tar.gz --exclude=logs /etc/openvpn /etc/systemd/system/openvpn-iptables*.service
+			rm -rf $INSTALL_DIR /etc/systemd/system/openvpn-iptables*.service /etc/systemd/system/openvpn-server@server.service.d/disable-limitnproc.conf /etc/sysctl.d/30-openvpn-forward.conf
 			if [[ "$os" = "debian" || "$os" = "ubuntu" ]]; then
 				apt-get remove --purge -y openvpn
 			else
@@ -1256,7 +1289,7 @@ else
 				yum remove -y openvpn
 			fi
 			echo
-			echo "OpenVPN已卸载!"
+			echo "OpenVPN已卸载！相关文件已备份在/tmp路径下！"
 		else
 			echo
 			echo "OpenVPN卸载中断!"
