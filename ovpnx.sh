@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #请勿删除该预制空变量，后续会赋予将安装后的用户角色编号
-setup_subnet_roles_nu=1,2,3,5
+setup_subnet_roles_nu=
 
 # set -x
 
@@ -394,8 +394,6 @@ mask2cdr() {
 	echo $(($2 + (${#x} / 4)))
 }
 
-
-
 if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 	system_check
 	clear
@@ -410,20 +408,21 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 	echo "    8. 增加安装时控制是否允许客户端之间进行网络互联，是否允许客户端访问服务端所在的网络"
 	echo "    9. 去除不必要的脚本代码"
 	# If system has a single IPv4, it is selected automatically. Else, ask the user
+	
 	if [[ $(ip -4 addr | grep inet | grep -vEc '127(\.[0-9]{1,3}){3}') -eq 1 ]]; then
 		ip=$(ip -4 addr | grep inet | grep -vE '127(\.[0-9]{1,3}){3}' | cut -d '/' -f 1 | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}')
 	else
-		display_mber_of_ip=$(ip -4 addr | grep inet | grep -vEc '127(\.[0-9]{1,3}){3}')
+		ip_nu=$(ip -4 addr | grep inet | grep -vEc '127(\.[0-9]{1,3}){3}')
 		echo
 		echo "1. OpenVPN服务端监听在以下哪个IPv4地址上?"
 		ip -4 addr | grep inet | grep -vE '127(\.[0-9]{1,3}){3}' | cut -d '/' -f 1 | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}' | nl -s ') '
-		read -p "IPv4地址，默认[1]: " ip_display_mber
-		until [[ -z "$ip_display_mber" || "$ip_display_mber" =~ ^[0-9]+$ && "$ip_number" -le "$number_of_ip" ]]; do
-			echo "$ip_number: 无效的选项."
-			read -p "IPv4地址[1]: " ip_number
+		read -p "IPv4地址，默认[1]: " listen_ip_nu
+		until [[ -z "$listen_ip_nu" || "$listen_ip_nu" =~ ^[0-9]+$ && "$listen_ip_nu" -le "$ip_nu" ]]; do
+			echo "$listen_ip_nu: 无效的选项."
+			read -p "IPv4地址[1]: " listen_ip_nu
 		done
-		[[ -z "$ip_number" ]] && ip_number="1"
-		ip=$(ip -4 addr | grep inet | grep -vE '127(\.[0-9]{1,3}){3}' | cut -d '/' -f 1 | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}' | sed -n "$ip_number"p)
+		[[ -z "$listen_ip_nu" ]] && ip_number="1"
+		ip=$(ip -4 addr | grep inet | grep -vE '127(\.[0-9]{1,3}){3}' | cut -d '/' -f 1 | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}' | sed -n "$listen_ip_nu"p)
 	fi
 	server_ip_local_netmask=$(ifconfig -a|grep $ip | grep -w 'inet' | awk -F'[ :]+' '{print $5}')
 
@@ -695,6 +694,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 	echo
 
 	echo "11. 开始准备安装OpenVPN服务端"
+	read -n1 -r -p "  按任意键继续"
 	if [[ "$os" = "debian" || "$os" = "ubuntu" ]]; then
 		echo "  正在下载安装OpenVPN软件"
 		apt-get update >/dev/null 2>&1
@@ -712,12 +712,12 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 	mkdir -p $INSTALL_DIR/server/{easy-rsa,ccd,logs,ip-pools,pki} $INSTALL_DIR/client/profiles
 	easy_rsa_url='https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.7/EasyRSA-3.0.7.tgz'
 	echo "  正在下载easy-rsa证书工具"
-	{ wget -qO- "$easy_rsa_url" 2>/dev/null || curl -# -sL "$easy_rsa_url"; } | tar xz -C $INSTALL_DIR/server/easy-rsa/ --strip-components 1
+    wget --tries=3 --continue --timeout=10 --show-progress --progress=dot -q $easy_rsa_url -O - | tar -xzf - -C /etc/openvpn/server/easy-rsa --strip-components 1 --exclude doc
 	if [[ $? == 0 && -f $INSTALL_DIR/server/easy-rsa/easyrsa ]] ;then
-		
 		chown -R root:root $INSTALL_DIR/server
 		# 创建CA和客户端证书
 		cd $INSTALL_DIR/server/easy-rsa/
+		echo 
 		echo "  正在创建CA和客户端证书"
 		./easyrsa init-pki >/dev/null 2>&1
 		./easyrsa --batch build-ca nopass >/dev/null 2>&1
@@ -743,6 +743,8 @@ ssbzSibBsu/6iGtCOGEoXJf//////////wIBAg==
 -----END DH PARAMETERS-----' >$INSTALL_DIR/server/pki/dh.pem
 	else
 		echo "easy-rsa证书工具下载失败，请检查网络状态"
+		sed -i 's/^setup_subnet_roles_nu=.*/setup_subnet_roles_nu=/g' $0
+		rm -rf $INSTALL_DIR
 		exit 1
 	fi
 	# Install a firewall in the rare case where one is not already available
@@ -759,7 +761,7 @@ ssbzSibBsu/6iGtCOGEoXJf//////////wIBAg==
 		fi
 	fi
 	echo "  正在检查防火墙软件，当前操作系统的防护墙为: $firewall"
-	read -n1 -r -p "  按任意键继续"
+	
 	# If running inside a container, disable LimitNPROC to prevent conflicts
 	if systemd-detect-virt -cq; then
 		mkdir /etc/systemd/system/openvpn-server@server.service.d/ 2>/dev/nul
@@ -788,9 +790,6 @@ LimitNPROC=infinity" >/etc/systemd/system/openvpn-server@server.service.d/disabl
 		seq -f "${server_subnet_robots_ip_pool%.*}.%g" 2 254 > $INSTALL_DIR/server/ip-pools/robots-ip-pools
 	fi
 
-	
-
-
 	# 生成OpenVPN服务端配置文件
 	echo "  正在生成OpenVPN服务端配置文件"
 	echo "local 0.0.0.0
@@ -813,7 +812,7 @@ script-security 3
 client-config-dir ccd
 ifconfig-pool-persist ipp.txt
 log-append logs/openvpn-server.log
-server $server_ip_net 255.255.255.0" >$INSTALL_DIR/server/server.conf
+server $server_ip_net 255.255.0.0" >$INSTALL_DIR/server/server.conf
 	echo "  正在生成OpenVPN服务端脚本"
 	echo "#!/bin/sh
 PASSFILE=\"$INSTALL_DIR/server/psw-file\"
@@ -1261,24 +1260,24 @@ else
 				for i in ${setup_subnet_roles_nu//,/ };do
 					case $i in
 						1)
-							systemctl disable --now openvpn-iptables-developer.service
-							systemctl stop --now openvpn-iptables-developer.service
+							systemctl disable --now openvpn-iptables-developer.service >/dev/null 2>&1
+							systemctl stop --now openvpn-iptables-developer.service >/dev/null 2>&1
 						;;
 						2)
-							systemctl disable --now openvpn-iptables-tester.service
-							systemctl stop --now openvpn-iptables-tester.service
+							systemctl disable --now openvpn-iptables-tester.service >/dev/null 2>&1
+							systemctl stop --now openvpn-iptables-tester.service >/dev/null 2>&1
 						;;
 						3)
-							systemctl disable --now openvpn-iptables-manager.service
-							systemctl stop --now openvpn-iptables-manager.service
+							systemctl disable --now openvpn-iptables-manager.service >/dev/null 2>&1
+							systemctl stop --now openvpn-iptables-manager.service >/dev/null 2>&1
 						;;
 						4)
-							systemctl disable --now openvpn-iptables-bussiness.service
-							systemctl stop --now openvpn-iptables-bussiness.service
+							systemctl disable --now openvpn-iptables-bussiness.service >/dev/null 2>&1
+							systemctl stop --now openvpn-iptables-bussiness.service >/dev/null 2>&1
 						;;
 						5)
-							systemctl disable --now openvpn-iptables-robots.service
-							systemctl stop --now openvpn-iptables-robots.service
+							systemctl disable --now openvpn-iptables-robots.service >/dev/null 2>&1
+							systemctl stop --now openvpn-iptables-robots.service >/dev/null 2>&1
 						;;
 					esac
 				done
@@ -1286,16 +1285,21 @@ else
 			
 			systemctl disable --now openvpn-server@server.service >/dev/null 2>&1
 			sed -i 's/^setup_subnet_roles_nu=.*/setup_subnet_roles_nu=/g' $0
-			tar -czvf /tmp/openvpn-$(date "+%Y%m%d").tar.gz --exclude=logs /etc/openvpn /etc/systemd/system/openvpn-iptables*.service
+			cp /etc/systemd/system/openvpn-iptables*.service /etc/openvpn
+			tar -czf /tmp/openvpn-$(date "+%Y%m%d%M").tar.gz --exclude=logs -C /etc openvpn
 			rm -rf $INSTALL_DIR /etc/systemd/system/openvpn-iptables*.service /etc/systemd/system/openvpn-server@server.service.d/disable-limitnproc.conf /etc/sysctl.d/30-openvpn-forward.conf
 			if [[ "$os" = "debian" || "$os" = "ubuntu" ]]; then
-				apt-get remove --purge -y openvpn
+				apt-get remove --purge -y openvpn >/dev/null 2>&1
 			else
 				# Else, OS must be CentOS or Fedora
-				yum remove -y openvpn
+				yum remove -y openvpn >/dev/null 2>&1
 			fi
 			echo
-			echo "OpenVPN已卸载！相关文件已备份在/tmp路径下！"
+			echo "######################################################################"
+			echo
+			echo "OpenVPN已卸载！相关文件已备份在/tmp路径下，请及时下载转移到其他存储位置！"
+			echo
+			echo "######################################################################"
 		else
 			echo
 			echo "OpenVPN卸载中断!"
