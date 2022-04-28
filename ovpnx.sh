@@ -942,7 +942,7 @@ client-disconnect openvpn-utils.sh" >>$INSTALL_DIR/server/server.conf
 			iptables_path=$(command -v iptables-legacy)
 			ip6tables_path=$(command -v ip6tables-legacy)
 		fi
-		set -x
+		
 		echo "  正在生成OpenVPN的iptables规则"
 		echo "[Unit]
 Before=network.target
@@ -1050,7 +1050,6 @@ ExecStop=$iptables_path -D FORWARD -s $server_subnet_robots_ip_pool/24 -j ACCEPT
 			echo -e "RemainAfterExit=yes\n[Install]\nWantedBy=multi-user.target" >>/etc/systemd/system/openvpn-iptables-robots.service
 			systemctl enable --now openvpn-iptables-robots.service
 		fi
-		set +x
 	fi
 	# If SELinux is enabled and a custom port was selected, we need this
 	if sestatus 2>/dev/null | grep "Current mode" | grep -q "enforcing" && [[ "$port" != 1194 ]]; then
@@ -1255,24 +1254,24 @@ else
 				for i in ${setup_subnet_roles_nu//,/ };do
 					case $i in
 						1)
-							systemctl stop --now openvpn-iptables-developer@server.service
-							systemctl disable --now openvpn-iptables-developer@server.service
+							systemctl disable --now openvpn-iptables-developer.service
+							systemctl stop --now openvpn-iptables-developer.service
 						;;
 						2)
-							systemctl stop --now openvpn-iptables-tester@server.service
-							systemctl disable --now openvpn-iptables-tester@server.service
+							systemctl disable --now openvpn-iptables-tester.service
+							systemctl stop --now openvpn-iptables-tester.service
 						;;
 						3)
-							systemctl stop --now openvpn-iptables-manager@server.service
-							systemctl disable --now openvpn-iptables-manager@server.service
+							systemctl disable --now openvpn-iptables-manager.service
+							systemctl stop --now openvpn-iptables-manager.service
 						;;
 						4)
-							systemctl stop --now openvpn-iptables-bussiness@server.service
-							systemctl disable --now openvpn-iptables-bussiness@server.service
+							systemctl disable --now openvpn-iptables-bussiness.service
+							systemctl stop --now openvpn-iptables-bussiness.service
 						;;
 						5)
-							systemctl stop --now openvpn-iptables-robots@server.service
-							systemctl disable --now openvpn-iptables-robots@server.service
+							systemctl disable --now openvpn-iptables-robots.service
+							systemctl stop --now openvpn-iptables-robots.service
 						;;
 					esac
 				done
