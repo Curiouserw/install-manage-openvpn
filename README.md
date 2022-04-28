@@ -42,7 +42,7 @@ git clone https://github.com/RationalMonster/install-manage-openvpn.git
 bash install-manage-openvpn/ovpnx.sh
 ```
 
-# 三、客户端连接方法参考
+# 三、客户端连接方法
 
 ## Linux
 
@@ -56,12 +56,14 @@ ps -ef |grep openvpn |grep "daemon" |awk '{print $2}' | xargs kill -9
 
 - Windows下使用客户端openvpn gui，将配置文件放置在`C盘:\用户\您的用户名\OpenVPN\config`目录下即可导入配置文件
 - Openvpn GUI下载地址：https://openvpn.net/community-downloads/
+- Openvpn GUI一次只能一个连接
 
 
 ## MacOS
 
 - MacOS下使用客户端tunnelblick，将配置文件使用tunnelblick打开即可导入配置文件
 - Tunnelblick下载地址：https://tunnelblick.net/downloads.html
+- Tunnelblick同时可以连接多个实例
 
 
 # 参考文章
