@@ -49,33 +49,31 @@ check_command() {
 	fi
 }
 
-# Detect OS
-# $os_version variables aren't always in use, but are kept here for convenience
-if grep -qs "ubuntu" /etc/os-release; then
-	os="ubuntu"
-	os_version=$(grep 'VERSION_ID' /etc/os-release | cut -d '"' -f 2 | tr -d '.')
-	group_name="nogroup"
-
-elif
-	[[ -e /etc/debian_version ]]
-then
-	os="debian"
-	os_version=$(grep -oE '[0-9]+' /etc/debian_version | head -1)
-	group_name="nogroup"
-elif [[ -e /etc/centos-release ]]; then
-	os="centos"
-	os_version=$(grep -oE '[0-9]+' /etc/centos-release | head -1)
-	group_name="nobody"
-elif [[ -e /etc/fedora-release ]]; then
-	os="fedora"
-	os_version=$(grep -oE '[0-9]+' /etc/fedora-release | head -1)
-	group_name="nobody"
-else
-	echo "本脚本只支持Ubuntu, Debian, CentOS, and Fedora."
-	exit
-fi
-
 system_check() {
+	# Detect OS
+	# $os_version variables aren't always in use, but are kept here for convenience
+	if grep -qs "ubuntu" /etc/os-release; then
+		os="ubuntu"
+		os_version=$(grep 'VERSION_ID' /etc/os-release | cut -d '"' -f 2 | tr -d '.')
+		group_name="nogroup"
+
+	elif [[ -e /etc/debian_version ]];then
+		os="debian"
+		os_version=$(grep -oE '[0-9]+' /etc/debian_version | head -1)
+		group_name="nogroup"
+	elif [[ -e /etc/centos-release ]]; then
+		os="centos"
+		os_version=$(grep -oE '[0-9]+' /etc/centos-release | head -1)
+		group_name="nobody"
+	elif [[ -e /etc/fedora-release ]]; then
+		os="fedora"
+		os_version=$(grep -oE '[0-9]+' /etc/fedora-release | head -1)
+		group_name="nobody"
+	else
+		echo "本脚本只支持Ubuntu, Debian, CentOS, and Fedora."
+		exit
+	fi
+
 	# Detect Debian users running the script with "sh" instead of bash
 	if readlink /proc/$$/exe | grep -q "dash"; then
 		echo '本脚本不支持使用sh执行'
