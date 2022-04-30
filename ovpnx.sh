@@ -21,6 +21,9 @@ check_command() {
 	if ! command -v wget >/dev/null 2>&1; then
 		no_command=$no_command"wget "
 	fi
+	if ! command -v ipset >/dev/null 2>&1; then
+		no_command=$no_command"ipset "
+	fi
 	if ! command -v tail >/dev/null 2>&1; then
 		no_command=$no_command"coreutils "
 	fi
@@ -359,7 +362,7 @@ new_client_profile(){
 		echo "ifconfig-push $cleint_ip 255.255.255.0" >>$INSTALL_DIR/server/ccd/$1
 		sed -i "/\<$cleint_ip\>/d" $INSTALL_DIR/server/ip-pools/$2-ip-pools
 	fi
-	echo "$2 $1" >> $INSTALL_DIR/client/clients-info
+	echo "$2 $1" >> $INSTALL_DIR/server/clients-info
 }
 new_client() {
 	check_smtp_server_profile
@@ -1153,7 +1156,7 @@ else
 		fi
 
 		read -p "请设置新用户角色: " new_client_role
-		until [[ -z "$new_client_role" || "$new_client_role" =~ ^[1|2|3|4]$ ]]; do
+		until [[ -z "$new_client_role" || "$new_client_role" =~ ^[1|2|3|4|5]$ ]]; do
 			echo "$new_client_role: 无效的选项."
 			read -p "请重新设置新用户角色" new_client_role
 		done
@@ -1184,40 +1187,31 @@ else
 			echo "$client_number: 无效的选项."
 			read -p "用户编号: " client_number
 		done
-		client=$(tail -n +2 $INSTALL_DIR/server/easy-rsa/pki/index.txt | grep "^V" | cut -d '=' -f 2 | sed -n "$client_number"p)
-		read -p "请确认是否要删除用户$client? [y/N]: " revoke
-		until [[ "$revoke" =~ ^[yYnN]*$ ]]; do
-			echo "$revoke: 无效的选项."
-			read -p "请确认是否要删除客户端用户$client [y/N]: " revoke
+		release_client_username=$(tail -n +2 $INSTALL_DIR/server/easy-rsa/pki/index.txt | grep "^V" | cut -d '=' -f 2 | sed -n "$client_number"p)
+
+		read -p "请确认是否要删除用户$release_client_username? [Y/n]: " revoke_client_option
+		until [[ "$revoke_client_option" =~ ^[Y]$ ]]; do
+			echo "$revoke_client_option: 无效的选项."
+			read -p "请确认是否要删除客户端用户$release_client_username [Y/n]: " revoke_client_option
 		done
-		if [[ "$revoke" =~ ^[yY]$ ]]; then
-			cd $INSTALL_DIR/server/easy-rsa/
-			./easyrsa --batch revoke "$client" >/dev/null 2>&1
-			EASYRSA_CRL_DAYS=3650 ./easyrsa gen-crl >/dev/null 2>&1
-			rm -f $INSTALL_DIR/server/crl.pem
-			cp $INSTALL_DIR/server/easy-rsa/pki/crl.pem $INSTALL_DIR/server/crl.pem
+		
+		if [[ "$revoke_client_option" =~ ^[Y]$ && -f $INSTALL_DIR/server/ccd/$release_client_username ]]; then
+			cd $INSTALL_DIR/server/easy-rsa
+			./easyrsa --batch revoke "$release_client_username" >/dev/null 2>&1
+			# EASYRSA_CRL_DAYS=3650 ./easyrsa gen-crl >/dev/null 2>&1
+			# rm -f $INSTALL_DIR/server/crl.pem
+			# cp $INSTALL_DIR/server/easy-rsa/pki/crl.pem $INSTALL_DIR/server/crl.pem
 			# CRL is read with each client connection, when OpenVPN is dropped to nobody
-			chown nobody:"$group_name" $INSTALL_DIR/server/crl.pem
-			rm -f $INSTALL_DIR/client/profiles/$client.ovpn
-			sed -i "/\<$client\>/d" $INSTALL_DIR/server/psw-file
-			if [[ -f $INSTALL_DIR/server/ccd/$client ]]; then
-				client_ip_ready_release=$(grep "ifconfig-push" $INSTALL_DIR/server/ccd/$client | awk '{print $2}')
-				if [[ $(echo $client_ip_ready_release | awk -F"." '{print $3}') -eq 6 ]]; then
-					echo $client_ip_ready_release >>$INSTALL_DIR/server/ip-pools/developer-ip-pools
-					rm -f $INSTALL_DIR/server/ccd/$client
-				fi
-				if [[ $(echo $client_ip_ready_release | awk -F"." '{print $3}') -eq 8 ]]; then
-					echo $client_ip_ready_release >>$INSTALL_DIR/server/ip-pools/tester-ip-pools
-					rm -f $INSTALL_DIR/server/ccd/$client
-				fi
-				if [[ $(echo $client_ip_ready_release | awk -F"." '{print $3}') -eq 3 ]]; then
-					echo $client_ip_ready_release >>$INSTALL_DIR/server/ip-pools/business-ip-pools
-					rm -f $INSTALL_DIR/server/ccd/$client
-				fi
-			fi
-			echo "用户$client已删除!"
+			# chown nobody:"$group_name" $INSTALL_DIR/server/crl.pem
+			client_ip_ready_release=$(grep "ifconfig-push" $INSTALL_DIR/server/ccd/$release_client_username | awk '{print $2}')
+			release_client_role=$(grep -w "$release_client_username" /etc/openvpn/server/clients-info |awk -F" " '{print $1}')
+			sed -i "/$release_client_username/d" $INSTALL_DIR/server/clients-info
+			sed -i "/\<$release_client_username\>/d" $INSTALL_DIR/server/psw-file
+			echo "$client_ip_ready_release" >> $INSTALL_DIR/server/ip-pools/$release_client_role-ip-pools
+			rm -f $INSTALL_DIR/server/ccd/$release_client_username $INSTALL_DIR/client/profiles/$release_client_username.ovpn
+			echo "用户$release_client_username已删除!"
 		else
-			echo "客户端用户$client删除中断!"
+			echo "客户端用户$release_client_username删除中断!"
 		fi
 		exit
 		;;
