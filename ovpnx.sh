@@ -1,8 +1,12 @@
 #!/bin/bash
 
 #请勿删除该预制空变量，后续会赋予将安装后的用户角色编号
-setup_subnet_roles_nu=
-
+setup_subnet_roles_nu=1,2,3,4,5
+developer_allowed_access_net=1
+tester_allowed_access_net=2
+manager_allowed_access_net=3
+bussiness_allowed_access_net=4
+robots_allowed_access_net=5
 # set -x
 
 INSTALL_DIR=/etc/openvpn
@@ -560,7 +564,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 					read -e -p "  请设置测试人员角色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_tester_ip_pool
 					until [[ -z "$server_subnet_tester_ip_pool" || ! $server_subnet_tester_ip_pool == $server_subnet_developer_ip_pool ]];do
 						read -p "  $server_subnet_tester_ip_pool网段已被占用，请重新设置测试人员角色IP地址网段：" server_subnet_tester_ip_pool
-						until [[ $server_subnet_tester_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
+						until [[ $server_subnet_tester_ip_pool =~ ^$server_ip_net_prefix.([1-9]?[0-9?|1[0-9][0-9]|2([0-4][0-9]|5[0-5]){1,3}\.0$ ]]; do
 							read -e -p "  $server_subnet_tester_ip_pool不属于$server_ip_net下的子网段，请重新设置测试人员角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_tester_ip_pool
 						done
 					done
@@ -646,19 +650,23 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 		case $i in
 			1)
 				read -p "  请设置开发人员角色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_developer_allow_net 
-
+				sed -i -e "s/^developer_allowed_access_net=.*/developer_allowed_access_net=$client_role_developer_allow_net/g" $0
 			;;
 			2)
 				read -p "  请设置测试人员角色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_tester_allow_net 
+				sed -i -e "s/^tester_allowed_access_net=.*/tester_allowed_access_net=$client_role_tester_allow_net/g" $0
 			;;
 			3)
 				read -p "  请设置运维人员角色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_manager_allow_net 
+				sed -i -e "s/^manager_allowed_access_net=.*/manager_allowed_access_net=$client_role_manager_allow_net/g" $0
 			;;
 			4)
 				read -p "  请设置业务人员角色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_bussiness_allow_net 
+				sed -i -e "s/^bussiness_allowed_access_net=.*/bussiness_allowed_access_net=$client_role_bussiness_allow_net/g" $0
 			;;
 			5)
 				read -p "  请设置机器人 角 色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_robots_allow_net 
+				sed -i -e "s/^robots_allowed_access_net=.*/robots_allowed_access_net=$client_role_robots_allow_net/g" $0
 			;;
 		esac	
 	done
@@ -1130,23 +1138,23 @@ else
 			for i in ${setup_subnet_roles_nu//,/ };do
 				case $i in
 					1)
-						echo "  ${display_nu}: 开发人员角色"
+						echo "  ${display_nu}: 开发人员角色，允许访问的网段或IP：$developer_allowed_access_net"
 						display_nu=$((display_nu+1))
 					;;
 					2)
-						echo "  ${display_nu}: 测试人员角色"
+						echo "  ${display_nu}: 测试人员角色，允许访问的网段或IP：$tester_allowed_access_net"
 						display_nu=$((display_nu+1))
 					;;
 					3)
-						echo "  ${display_nu}: 运维人员角色"
+						echo "  ${display_nu}: 运维人员角色，允许访问的网段或IP：$manager_allowed_access_net"
 						display_nu=$((display_nu+1))
 					;;
 					4)
-						echo "  ${display_nu}: 业务人员角色"
+						echo "  ${display_nu}: 业务人员角色，允许访问的网段或IP：$bussiness_allowed_access_net"
 						display_nu=$((display_nu+1))
 					;;
 					5)
-						echo "  ${display_nu}: 机器人 角 色"
+						echo "  ${display_nu}: 机器人 角 色，允许访问的网段或IP：$robots_allowed_access_net"
 						display_nu=$((display_nu+1))
 					;;
 				esac
@@ -1276,7 +1284,12 @@ else
 			fi
 			
 			systemctl disable --now openvpn-server@server.service >/dev/null 2>&1
-			sed -i 's/^setup_subnet_roles_nu=.*/setup_subnet_roles_nu=/g' $0
+			sed -i -e 's/^setup_subnet_roles_nu=.*/setup_subnet_roles_nu=/g' \
+			       -e 's/^developer_allowed_access_net=.*/developer_allowed_access_net=/g' \
+			       -e 's/^tester_allowed_access_net=.*/tester_allowed_access_net=/g' \
+			       -e 's/^manager_allowed_access_net=.*/manager_allowed_access_net=/g' \
+			       -e 's/^bussiness_allowed_access_net=.*/bussiness_allowed_access_net=/g' \
+			       -e 's/^robots_allowed_access_net=.*/robots_allowed_access_net=/g' $0
 			cp /etc/systemd/system/openvpn-iptables*.service /etc/openvpn
 			tar -czf /tmp/openvpn-$(date "+%Y%m%d%M").tar.gz --exclude=logs -C /etc openvpn
 			rm -rf $INSTALL_DIR /etc/systemd/system/openvpn-iptables*.service /etc/systemd/system/openvpn-server@server.service.d/disable-limitnproc.conf /etc/sysctl.d/30-openvpn-forward.conf
