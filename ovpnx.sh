@@ -362,6 +362,7 @@ new_client_profile(){
 	if [[ ! -f $INSTALL_DIR/server/ccd/$1 ]]; then
 		cleint_ip=$(head -n 1 $INSTALL_DIR/server/ip-pools/$2-ip-pools)
 		echo "ifconfig-push $cleint_ip 255.255.255.0" >>$INSTALL_DIR/server/ccd/$1
+		echo -e "push \"route $3 255.255.255.0 $cleint_ip\"" >>$INSTALL_DIR/server/ccd/$1
 		sed -i "/\<$cleint_ip\>/d" $INSTALL_DIR/server/ip-pools/$2-ip-pools
 	fi
 	echo "$2 $1" >> $INSTALL_DIR/server/clients-info
@@ -371,19 +372,19 @@ new_client() {
 	if [ $? -eq 0 ]; then
 		case "$2" in
 		1)
-			new_client_profile $1 developer
+			new_client_profile $1 developer $4
 		;;
 		2)
-			new_client_profile $1 tester
+			new_client_profile $1 tester $4
 			;;
 		3)
-			new_client_profile $1 manager
+			new_client_profile $1 manager $4
 			;;
 		4)
-			new_client_profile $1 bussiness
+			new_client_profile $1 bussiness $4
 			;;
 		5)
-			new_client_profile $1 robots
+			new_client_profile $1 robots $4
 			;;
 		esac
 
@@ -564,7 +565,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 					read -e -p "  请设置测试人员角色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_tester_ip_pool
 					until [[ -z "$server_subnet_tester_ip_pool" || ! $server_subnet_tester_ip_pool == $server_subnet_developer_ip_pool ]];do
 						read -p "  $server_subnet_tester_ip_pool网段已被占用，请重新设置测试人员角色IP地址网段：" server_subnet_tester_ip_pool
-						until [[ $server_subnet_tester_ip_pool =~ ^$server_ip_net_prefix.([1-9]?[0-9?|1[0-9][0-9]|2([0-4][0-9]|5[0-5]){1,3}\.0$ ]]; do
+						until [[ $server_subnet_tester_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
 							read -e -p "  $server_subnet_tester_ip_pool不属于$server_ip_net下的子网段，请重新设置测试人员角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_tester_ip_pool
 						done
 					done
@@ -1171,8 +1172,8 @@ else
 		until [[ -z ${user_email_address+x} || ${user_email_address} =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$ ]]; do
 			read -p "${user_email_address}不是一个正确的邮箱格式，请重新设置: " user_email_address
 		done
-
-		new_client $client $new_client_role $user_email_address
+		tmp_var=${new_client_role}_allowed_access_net
+		new_client $client $new_client_role $user_email_address ${!tmp_var}
 		exit
 		;;
 	2)
