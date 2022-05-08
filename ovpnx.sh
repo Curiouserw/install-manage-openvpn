@@ -1,12 +1,12 @@
 #!/bin/bash
 
 #请勿删除该预制空变量，后续会赋予将安装后的用户角色编号
-setup_subnet_roles_nu=1,2,3,4,5
-developer_allowed_access_net=1
-tester_allowed_access_net=2
-manager_allowed_access_net=3
-bussiness_allowed_access_net=4
-robots_allowed_access_net=5
+setup_subnet_roles_nu=1,2,3,5
+developer_allowed_access_net=
+tester_allowed_access_net=
+manager_allowed_access_net=
+bussiness_allowed_access_net=
+robots_allowed_access_net=
 # set -x
 
 INSTALL_DIR=/etc/openvpn
@@ -557,13 +557,13 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 			case $i in
 				1)
 					read -e -p "  请设置开发人员角色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_developer_ip_pool
-					until [[ -z "$server_subnet_developer_ip_pool" || $server_subnet_developer_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
+					until [[ ! -z "$server_subnet_developer_ip_pool" && $server_subnet_developer_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
 						read -e -p "  $server_subnet_developer_ip_pool不属于$server_ip_net下的子网段，请重新设置开发人员角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_developer_ip_pool
 					done
 				;;
 				2)
 					read -e -p "  请设置测试人员角色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_tester_ip_pool
-					until [[ -z "$server_subnet_tester_ip_pool" || ! $server_subnet_tester_ip_pool == $server_subnet_developer_ip_pool ]];do
+					until [[ ! -z "$server_subnet_tester_ip_pool" && ! $server_subnet_tester_ip_pool == $server_subnet_developer_ip_pool ]];do
 						read -p "  $server_subnet_tester_ip_pool网段已被占用，请重新设置测试人员角色IP地址网段：" server_subnet_tester_ip_pool
 						until [[ $server_subnet_tester_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
 							read -e -p "  $server_subnet_tester_ip_pool不属于$server_ip_net下的子网段，请重新设置测试人员角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_tester_ip_pool
@@ -572,7 +572,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 				;;
 				3)
 					read -e -p "  请设置运维人员角色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_manager_ip_pool
-					until [[ -z "$server_subnet_manager_ip_pool" || ! $server_subnet_manager_ip_pool == $server_subnet_developer_ip_pool && ! $server_subnet_manager_ip_pool == $server_subnet_tester_ip_pool ]]; do
+					until [[ ! -z "$server_subnet_manager_ip_pool" && ! $server_subnet_manager_ip_pool == $server_subnet_developer_ip_pool && ! $server_subnet_manager_ip_pool == $server_subnet_tester_ip_pool ]]; do
 						read -p "  $server_subnet_manager_ip_pool网段已被占用，请重新设置运维人员角色IP地址网段：" server_subnet_manager_ip_pool
 						until [[ $server_subnet_manager_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
 							read -e -p "  $server_subnet_manager_ip_pool不属于$server_ip_net下的子网段，请重新设置运维人员角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_manager_ip_pool
@@ -582,7 +582,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 				4)
 					read -e -p "  请设置业务人员角色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_bussiness_ip_pool
 
-					until [[ -z "$server_subnet_bussiness_ip_pool" || ! $server_subnet_bussiness_ip_pool == $server_subnet_developer_ip_pool && ! $server_subnet_bussiness_ip_pool == $server_subnet_tester_ip_pool && ! $server_subnet_bussiness_ip_pool == $server_subnet_manager_ip_pool ]]; do
+					until [[ ! -z "$server_subnet_bussiness_ip_pool" && ! $server_subnet_bussiness_ip_pool == $server_subnet_developer_ip_pool && ! $server_subnet_bussiness_ip_pool == $server_subnet_tester_ip_pool && ! $server_subnet_bussiness_ip_pool == $server_subnet_manager_ip_pool ]]; do
 						read -p "  $server_subnet_bussiness_ip_pool网段已被占用，请重新设置业务人员角色IP地址网段：" server_subnet_bussiness_ip_pool
 						until [[ $server_subnet_bussiness_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
 							read -e -p "  $server_subnet_bussiness_ip_pool不属于$server_ip_net下的子网段，请重新设置业务人员角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_bussiness_ip_pool
@@ -592,7 +592,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 				5)
 					read -e -p "  请设置机器人 角 色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_robots_ip_pool
 					
-					until [[ -z "$server_subnet_robots_ip_pool" || ! $server_subnet_robots_ip_pool == $server_subnet_developer_ip_pool && ! $server_subnet_robots_ip_pool == $server_subnet_tester_ip_pool && ! $server_subnet_robots_ip_pool == $server_subnet_manager_ip_pool && ! $server_subnet_robots_ip_pool == $server_subnet_bussiness_ip_pool ]]; do
+					until [[ ! -z "$server_subnet_robots_ip_pool" && ! $server_subnet_robots_ip_pool == $server_subnet_developer_ip_pool && ! $server_subnet_robots_ip_pool == $server_subnet_tester_ip_pool && ! $server_subnet_robots_ip_pool == $server_subnet_manager_ip_pool && ! $server_subnet_robots_ip_pool == $server_subnet_bussiness_ip_pool ]]; do
 						read -p "  $server_subnet_robots_ip_pool网段已被占用，请重新设置机器人角色IP地址网段：" server_subnet_robots_ip_pool
 						until [[ $server_subnet_robots_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
 							read -e -p "  $server_subnet_robots_ip_pool不属于$server_ip_net下的子网段，请重新设置机器人角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_robots_ip_pool
@@ -655,19 +655,19 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 			;;
 			2)
 				read -p "  请设置测试人员角色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_tester_allow_net 
-				sed -i -e "s/^tester_allowed_access_net=.*/tester_allowed_access_net=$client_role_tester_allow_net/g" $0
+				sed -i -e "s/^tester_allowed_access_net=.*/tester_allowed_access_net=$client_role_developer_allow_net/g" $0
 			;;
 			3)
 				read -p "  请设置运维人员角色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_manager_allow_net 
-				sed -i -e "s/^manager_allowed_access_net=.*/manager_allowed_access_net=$client_role_manager_allow_net/g" $0
+				sed -i -e "s/^manager_allowed_access_net=.*/manager_allowed_access_net=$client_role_developer_allow_net/g" $0
 			;;
 			4)
 				read -p "  请设置业务人员角色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_bussiness_allow_net 
-				sed -i -e "s/^bussiness_allowed_access_net=.*/bussiness_allowed_access_net=$client_role_bussiness_allow_net/g" $0
+				sed -i -e "s/^bussiness_allowed_access_net=.*/bussiness_allowed_access_net=$client_role_developer_allow_net/g" $0
 			;;
 			5)
 				read -p "  请设置机器人 角 色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_robots_allow_net 
-				sed -i -e "s/^robots_allowed_access_net=.*/robots_allowed_access_net=$client_role_robots_allow_net/g" $0
+				sed -i -e "s/^robots_allowed_access_net=.*/robots_allowed_access_net=$client_role_developer_allow_net/g" $0
 			;;
 		esac	
 	done
