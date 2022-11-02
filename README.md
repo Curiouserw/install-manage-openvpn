@@ -24,8 +24,6 @@
   - [x] 检查并优化系统参数
   - [x] 20220429: 新增卸载时备份配置和iptables规则等相关文件到/tmp目录中
 
-
-
 # 一、OpenVPN安装管理脚本
 
 ## 根据 https://github.com/Nyr/openvpn-install 进行的功能优化
@@ -65,7 +63,6 @@ ps -ef |grep openvpn |grep "daemon" |awk '{print $2}' | xargs kill -9
 - Windows下使用客户端openvpn gui，将配置文件放置在`C盘:\用户\您的用户名\OpenVPN\config`目录下即可导入配置文件
 - Openvpn GUI下载地址：https://openvpn.net/community-downloads/
 - Openvpn GUI一次只能一个连接
-
 
 ## MacOS
 

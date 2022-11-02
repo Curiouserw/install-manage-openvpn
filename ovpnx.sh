@@ -1,7 +1,7 @@
 #!/bin/bash
 
 #请勿删除该预制空变量，后续会赋予将安装后的用户角色编号
-setup_subnet_roles_nu=1,2,3,5
+setup_subnet_roles_nu=
 developer_allowed_access_net=
 tester_allowed_access_net=
 manager_allowed_access_net=
@@ -10,6 +10,7 @@ robots_allowed_access_net=
 # set -x
 
 INSTALL_DIR=/etc/openvpn
+SHELL_FOLDER=$(cd "$(dirname "$0")";pwd)
 
 check_command() {
 	no_command=""
@@ -99,7 +100,7 @@ system_check() {
 	fi
 
 	if [[ "$os" == "ubuntu" ]]; then
-		if cat /etc/apt/sources.list |grep -vE "#" |grep -E "ustc.edu|aliyun|tuna.tsinghua|163" ;then
+		if cat /etc/apt/sources.list |grep -vE "#" |grep -E "ustc.edu|aliyun|tuna.tsinghua|163|tencentyun" ;then
 			echo "apt源已经是国内源，无需设置"
 		else
 			cp /etc/apt/sources.list /etc/apt/sources.list.d/tmp.list
@@ -535,9 +536,10 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 			echo "  $server_ip_net为无效的IP地址池网段"
 			read -p "  请设置有效的客户端IP地址池网段: " server_ip_net
 		done
+		[[ -z "$server_ip_net" ]] && server_ip_net="10.6.0.0"
 		echo 
 		server_ip_net_prefix=$(echo $server_ip_net | cut -d . -f 1,2)
-		echo "5. 请设置客户端角色，内置角色网段划分，可根据编号选择，多个已逗号分割："
+		echo "5. 请设置客户端角色，内置角色网段划分，可根据编号选择，多选以逗号分割："
 		echo -e "  1) \033[41;30m开发人员角色\033[0m"
 		echo -e "  2) \033[41;30m测试人员角色\033[0m"
 		echo -e "  3) \033[41;30m运维人员角色\033[0m"
@@ -545,7 +547,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 		echo -e "  5) \033[41;30m机器人 角 色\033[0m"
 		echo -e "  6) \033[41;30m以上所有角色\033[0m"
 		read -p "请选择预设置客户端角色: " server_ip_subnet_roles
-		until [[ -z "$server_ip_subnet_roles" || ${server_ip_subnet_roles} =~ ^[1-9,]{1,9}$ ]];do
+		until [[ -z "$server_ip_subnet_roles" || ${server_ip_subnet_roles} =~ ^[1-6,]{1,9}$ ]];do
 			echo "  $server_ip_subnet_roles为无效值"
 			read -p "请重新设置客户端角色: " server_ip_subnet_roles
 		done
@@ -598,6 +600,9 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 							read -e -p "  $server_subnet_robots_ip_pool不属于$server_ip_net下的子网段，请重新设置机器人角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_robots_ip_pool
 						done
 					done				
+				;;
+				*)
+					echo "客户端角色设置错误：$i"
 				;;
 			esac
 		done
@@ -722,7 +727,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 	mkdir -p $INSTALL_DIR/server/{easy-rsa,ccd,logs,ip-pools,pki} $INSTALL_DIR/client/profiles
 	easy_rsa_url='https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.7/EasyRSA-3.0.7.tgz'
 	echo "  正在下载easy-rsa证书工具"
-    wget --tries=3 --continue --timeout=10 --show-progress --progress=dot -q $easy_rsa_url -O - | tar -xzf - -C /etc/openvpn/server/easy-rsa --strip-components 1 --exclude doc
+    wget --tries=5 --continue --timeout=10 --show-progress --progress=dot -q $easy_rsa_url -O - | tar -xzf - -C /etc/openvpn/server/easy-rsa --strip-components 1 --exclude doc
 	if [[ $? == 0 && -f $INSTALL_DIR/server/easy-rsa/easyrsa ]] ;then
 		chown -R root:root $INSTALL_DIR/server
 		# 创建CA和客户端证书
@@ -1101,10 +1106,12 @@ auth-user-pass" >$INSTALL_DIR/server/client-common.txt
 	# Enable and start the OpenVPN service
 	echo "  正在启动OpenVPN服务并设置开机自启"
 	systemctl enable --now openvpn-server@server.service >/dev/null 2>&1
+	cp $SHELL_FOLDER/$0 /usr/local/bin/ovpnx
 	echo "########################################################"
 	echo
 	echo "1. 管理端口密码已保存在$INSTALL_DIR/server/management-psw-file文件中，更多管理端口的使用方法详见:https://openvpn.net/community-resources/management-interface"
 	echo "2. OpenVPN服务安装完成！可重新运行此脚本执行添加用户等其他功能"
+	echo "3. 管理脚本已移动至/usr/local/bin/下"
 	echo
 	echo "########################################################"
 else
@@ -1292,7 +1299,9 @@ else
 			       -e 's/^bussiness_allowed_access_net=.*/bussiness_allowed_access_net=/g' \
 			       -e 's/^robots_allowed_access_net=.*/robots_allowed_access_net=/g' $0
 			cp /etc/systemd/system/openvpn-iptables*.service /etc/openvpn
-			tar -czf /tmp/openvpn-$(date "+%Y%m%d%M").tar.gz --exclude=logs -C /etc openvpn
+			mv /usr/local/bin/ovpnx /etc/openvpn
+			backupdate=$(date "+%Y%m%d%M")
+			tar -czf /tmp/openvpn-$backupdate.tar.gz --exclude=logs -C /etc openvpn
 			rm -rf $INSTALL_DIR /etc/systemd/system/openvpn-iptables*.service /etc/systemd/system/openvpn-server@server.service.d/disable-limitnproc.conf /etc/sysctl.d/30-openvpn-forward.conf
 			if [[ "$os" = "debian" || "$os" = "ubuntu" ]]; then
 				apt-get remove --purge -y openvpn >/dev/null 2>&1
@@ -1303,7 +1312,7 @@ else
 			echo
 			echo "######################################################################"
 			echo
-			echo "OpenVPN已卸载！相关文件已备份在/tmp路径下，请及时下载转移到其他存储位置！"
+			echo "OpenVPN已卸载！相关文件已备份在/tmp/openvpn-$backupdate.tar.gz，请及时下载到其他存储位置！"
 			echo
 			echo "######################################################################"
 		else
