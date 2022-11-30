@@ -2,6 +2,7 @@
 
 #请勿删除该预制空变量，后续会赋予将安装后的用户角色编号
 setup_subnet_roles_nu=
+setup_subnet_roles=
 developer_allowed_access_net=
 tester_allowed_access_net=
 manager_allowed_access_net=
@@ -62,7 +63,7 @@ system_check() {
 		os_version=$(grep 'VERSION_ID' /etc/os-release | cut -d '"' -f 2 | tr -d '.')
 		group_name="nogroup"
 
-	elif [[ -e /etc/debian_version ]];then
+	elif [[ -e /etc/debian_version ]]; then
 		os="debian"
 		os_version=$(grep -oE '[0-9]+' /etc/debian_version | head -1)
 		group_name="nogroup"
@@ -100,7 +101,7 @@ system_check() {
 	fi
 
 	if [[ "$os" == "ubuntu" ]]; then
-		if cat /etc/apt/sources.list |grep -vE "#" |grep -E "ustc.edu|aliyun|tuna.tsinghua|163|tencentyun" ;then
+		if cat /etc/apt/sources.list | grep -vE "#" | grep -E "ustc.edu|aliyun|tuna.tsinghua|163|tencentyun"; then
 			echo "apt源已经是国内源，无需设置"
 		else
 			cp /etc/apt/sources.list /etc/apt/sources.list.d/tmp.list
@@ -338,10 +339,12 @@ Content-Disposition: attachment; filename=\"OpenVPN-MacOS.ovpn\"
 	fi
 }
 
-
-new_client_profile(){
+# 参数1：用户名
+# 参数2；用户角色
+# 参数3: 用户角色放行的IP地址段
+new_client_profile() {
 	cd $INSTALL_DIR/server/easy-rsa/
-	EASYRSA_CERT_EXPIRE=3650 ./easyrsa build-client-full "$1" nopass
+	EASYRSA_CERT_EXPIRE=36500 ./easyrsa build-client-full "$1" nopass
 	# Generates the custom client.ovpn
 	{
 		cat $INSTALL_DIR/server/client-common.txt
@@ -366,15 +369,19 @@ new_client_profile(){
 		echo -e "push \"route $3 255.255.255.0 $cleint_ip\"" >>$INSTALL_DIR/server/ccd/$1
 		sed -i "/\<$cleint_ip\>/d" $INSTALL_DIR/server/ip-pools/$2-ip-pools
 	fi
-	echo "$2 $1" >> $INSTALL_DIR/server/clients-info
+	echo "$2 $1" >>$INSTALL_DIR/server/clients-info
 }
+# 参数1：用户名
+# 参数2；用户角色id
+# 参数3：用户邮箱地址
+# 参数4：用户角色放行的IP地址段
 new_client() {
 	check_smtp_server_profile
 	if [ $? -eq 0 ]; then
 		case "$2" in
 		1)
 			new_client_profile $1 developer $4
-		;;
+    		;;
 		2)
 			new_client_profile $1 tester $4
 			;;
@@ -390,7 +397,7 @@ new_client() {
 		esac
 
 		send_email $3 $1 $client_random_password $INSTALL_DIR/client/profiles/$1.ovpn
-		
+
 	fi
 }
 
@@ -415,7 +422,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 	echo "    8. 增加安装时控制是否允许客户端之间进行网络互联，是否允许客户端访问服务端所在的网络"
 	echo "    9. 去除不必要的脚本代码"
 	# If system has a single IPv4, it is selected automatically. Else, ask the user
-	
+
 	if [[ $(ip -4 addr | grep inet | grep -vEc '127(\.[0-9]{1,3}){3}') -eq 1 ]]; then
 		ip=$(ip -4 addr | grep inet | grep -vE '127(\.[0-9]{1,3}){3}' | cut -d '/' -f 1 | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}')
 	else
@@ -431,7 +438,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 		[[ -z "$listen_ip_nu" ]] && ip_number="1"
 		ip=$(ip -4 addr | grep inet | grep -vE '127(\.[0-9]{1,3}){3}' | cut -d '/' -f 1 | grep -oE '[0-9]{1,3}(\.[0-9]{1,3}){3}' | sed -n "$listen_ip_nu"p)
 	fi
-	server_ip_local_netmask=$(ifconfig -a|grep $ip | grep -w 'inet' | awk -F'[ :]+' '{print $5}')
+	server_ip_local_netmask=$(ifconfig -a | grep $ip | grep -w 'inet' | awk -F'[ :]+' '{print $5}')
 
 	server_ip_local_net_cdr=$(mask2cdr $server_ip_local_netmask)
 	case "$server_ip_local_net_cdr" in
@@ -502,9 +509,9 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 	done
 	[[ -z "$server_ip_subnet_option" ]] && server_ip_subnet_option="1"
 	echo
-	 
+
 	case "$server_ip_subnet_option" in
-	1 )
+	1)
 		echo "4. 单网络段模式：配置OpenVPN客户端IP地址池网段"
 		echo -e "  1) \033[41;30m10.8.1.0\033[0m"
 		echo -e "  2) \033[41;30m10.6.2.0\033[0m"
@@ -537,7 +544,7 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 			read -p "  请设置有效的客户端IP地址池网段: " server_ip_net
 		done
 		[[ -z "$server_ip_net" ]] && server_ip_net="10.6.0.0"
-		echo 
+		echo
 		server_ip_net_prefix=$(echo $server_ip_net | cut -d . -f 1,2)
 		echo "5. 请设置客户端角色，内置角色网段划分，可根据编号选择，多选以逗号分割："
 		echo -e "  1) \033[41;30m开发人员角色\033[0m"
@@ -547,62 +554,67 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 		echo -e "  5) \033[41;30m机器人 角 色\033[0m"
 		echo -e "  6) \033[41;30m以上所有角色\033[0m"
 		read -p "请选择预设置客户端角色: " server_ip_subnet_roles
-		until [[ -z "$server_ip_subnet_roles" || ${server_ip_subnet_roles} =~ ^[1-6,]{1,9}$ ]];do
+		until [[ -z "$server_ip_subnet_roles" || ${server_ip_subnet_roles} =~ ^[1-6,]{1,9}$ ]]; do
 			echo "  $server_ip_subnet_roles为无效值"
 			read -p "请重新设置客户端角色: " server_ip_subnet_roles
 		done
-		if [[ $server_ip_subnet_roles == 6 ]];then
+		if [[ $server_ip_subnet_roles == 6 ]]; then
 			server_ip_subnet_roles=1,2,3,4,5
 		fi
 		sed -i -e "s/^setup_subnet_roles_nu=.*/setup_subnet_roles_nu=$server_ip_subnet_roles/g" $0
-		for i in ${server_ip_subnet_roles//,/ };do
+		for i in ${server_ip_subnet_roles//,/ }; do
 			case $i in
-				1)
-					read -e -p "  请设置开发人员角色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_developer_ip_pool
-					until [[ ! -z "$server_subnet_developer_ip_pool" && $server_subnet_developer_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
-						read -e -p "  $server_subnet_developer_ip_pool不属于$server_ip_net下的子网段，请重新设置开发人员角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_developer_ip_pool
-					done
+			1)
+				read -e -p "  请设置开发人员角色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_developer_ip_pool
+				until [[ ! -z "$server_subnet_developer_ip_pool" && $server_subnet_developer_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
+					read -e -p "  $server_subnet_developer_ip_pool不属于$server_ip_net下的子网段，请重新设置开发人员角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_developer_ip_pool
+				done
+				sed -i -e "/^setup_subnet_roles=.*/ s/$/1:developer,/g" $0
 				;;
-				2)
-					read -e -p "  请设置测试人员角色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_tester_ip_pool
-					until [[ ! -z "$server_subnet_tester_ip_pool" && ! $server_subnet_tester_ip_pool == $server_subnet_developer_ip_pool ]];do
-						read -p "  $server_subnet_tester_ip_pool网段已被占用，请重新设置测试人员角色IP地址网段：" server_subnet_tester_ip_pool
-						until [[ $server_subnet_tester_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
-							read -e -p "  $server_subnet_tester_ip_pool不属于$server_ip_net下的子网段，请重新设置测试人员角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_tester_ip_pool
-						done
+			2)
+				read -e -p "  请设置测试人员角色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_tester_ip_pool
+				until [[ ! -z "$server_subnet_tester_ip_pool" && ! $server_subnet_tester_ip_pool == $server_subnet_developer_ip_pool ]]; do
+					read -p "  $server_subnet_tester_ip_pool网段已被占用，请重新设置测试人员角色IP地址网段：" server_subnet_tester_ip_pool
+					until [[ $server_subnet_tester_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
+						read -e -p "  $server_subnet_tester_ip_pool不属于$server_ip_net下的子网段，请重新设置测试人员角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_tester_ip_pool
 					done
+				done
+				sed -i -e "/^setup_subnet_roles=.*/ s/$/2:tester,/g" $0
 				;;
-				3)
-					read -e -p "  请设置运维人员角色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_manager_ip_pool
-					until [[ ! -z "$server_subnet_manager_ip_pool" && ! $server_subnet_manager_ip_pool == $server_subnet_developer_ip_pool && ! $server_subnet_manager_ip_pool == $server_subnet_tester_ip_pool ]]; do
-						read -p "  $server_subnet_manager_ip_pool网段已被占用，请重新设置运维人员角色IP地址网段：" server_subnet_manager_ip_pool
-						until [[ $server_subnet_manager_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
-							read -e -p "  $server_subnet_manager_ip_pool不属于$server_ip_net下的子网段，请重新设置运维人员角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_manager_ip_pool
-						done
+			3)
+				read -e -p "  请设置运维人员角色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_manager_ip_pool
+				until [[ ! -z "$server_subnet_manager_ip_pool" && ! $server_subnet_manager_ip_pool == $server_subnet_developer_ip_pool && ! $server_subnet_manager_ip_pool == $server_subnet_tester_ip_pool ]]; do
+					read -p "  $server_subnet_manager_ip_pool网段已被占用，请重新设置运维人员角色IP地址网段：" server_subnet_manager_ip_pool
+					until [[ $server_subnet_manager_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
+						read -e -p "  $server_subnet_manager_ip_pool不属于$server_ip_net下的子网段，请重新设置运维人员角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_manager_ip_pool
 					done
+				done
+				sed -i -e "/^setup_subnet_roles=.*/ s/$/3:manager,/g" $0
 				;;
-				4)
-					read -e -p "  请设置业务人员角色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_bussiness_ip_pool
+			4)
+				read -e -p "  请设置业务人员角色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_bussiness_ip_pool
 
-					until [[ ! -z "$server_subnet_bussiness_ip_pool" && ! $server_subnet_bussiness_ip_pool == $server_subnet_developer_ip_pool && ! $server_subnet_bussiness_ip_pool == $server_subnet_tester_ip_pool && ! $server_subnet_bussiness_ip_pool == $server_subnet_manager_ip_pool ]]; do
-						read -p "  $server_subnet_bussiness_ip_pool网段已被占用，请重新设置业务人员角色IP地址网段：" server_subnet_bussiness_ip_pool
-						until [[ $server_subnet_bussiness_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
-							read -e -p "  $server_subnet_bussiness_ip_pool不属于$server_ip_net下的子网段，请重新设置业务人员角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_bussiness_ip_pool
-						done
+				until [[ ! -z "$server_subnet_bussiness_ip_pool" && ! $server_subnet_bussiness_ip_pool == $server_subnet_developer_ip_pool && ! $server_subnet_bussiness_ip_pool == $server_subnet_tester_ip_pool && ! $server_subnet_bussiness_ip_pool == $server_subnet_manager_ip_pool ]]; do
+					read -p "  $server_subnet_bussiness_ip_pool网段已被占用，请重新设置业务人员角色IP地址网段：" server_subnet_bussiness_ip_pool
+					until [[ $server_subnet_bussiness_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
+						read -e -p "  $server_subnet_bussiness_ip_pool不属于$server_ip_net下的子网段，请重新设置业务人员角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_bussiness_ip_pool
 					done
+				done
+				sed -i -e "/^setup_subnet_roles=.*/ s/$/4:bussiness,/g" $0
 				;;
-				5)
-					read -e -p "  请设置机器人 角 色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_robots_ip_pool
-					
-					until [[ ! -z "$server_subnet_robots_ip_pool" && ! $server_subnet_robots_ip_pool == $server_subnet_developer_ip_pool && ! $server_subnet_robots_ip_pool == $server_subnet_tester_ip_pool && ! $server_subnet_robots_ip_pool == $server_subnet_manager_ip_pool && ! $server_subnet_robots_ip_pool == $server_subnet_bussiness_ip_pool ]]; do
-						read -p "  $server_subnet_robots_ip_pool网段已被占用，请重新设置机器人角色IP地址网段：" server_subnet_robots_ip_pool
-						until [[ $server_subnet_robots_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
-							read -e -p "  $server_subnet_robots_ip_pool不属于$server_ip_net下的子网段，请重新设置机器人角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_robots_ip_pool
-						done
-					done				
+			5)
+				read -e -p "  请设置机器人 角 色IP地址网段：" -i "${server_ip_net_prefix}." server_subnet_robots_ip_pool
+
+				until [[ ! -z "$server_subnet_robots_ip_pool" && ! $server_subnet_robots_ip_pool == $server_subnet_developer_ip_pool && ! $server_subnet_robots_ip_pool == $server_subnet_tester_ip_pool && ! $server_subnet_robots_ip_pool == $server_subnet_manager_ip_pool && ! $server_subnet_robots_ip_pool == $server_subnet_bussiness_ip_pool ]]; do
+					read -p "  $server_subnet_robots_ip_pool网段已被占用，请重新设置机器人角色IP地址网段：" server_subnet_robots_ip_pool
+					until [[ $server_subnet_robots_ip_pool =~ ^$server_ip_net_prefix.[1-9]{1,3}\.0$ ]]; do
+						read -e -p "  $server_subnet_robots_ip_pool不属于$server_ip_net下的子网段，请重新设置机器人角色IP地址网段: " -i "${server_ip_net_prefix}." server_subnet_robots_ip_pool
+					done
+				done
+				sed -i -e "/^setup_subnet_roles=.*/ s/$/5:robots/g" $0
 				;;
-				*)
-					echo "客户端角色设置错误：$i"
+			*)
+				echo "客户端角色设置错误：$i"
 				;;
 			esac
 		done
@@ -652,31 +664,30 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 	done
 	[[ -z "$setup_client_conn_server_net" ]] && setup_client_conn_server_net="y"
 
-    for i in ${server_ip_subnet_roles//,/ };do
+	for i in ${server_ip_subnet_roles//,/ }; do
 		case $i in
-			1)
-				read -p "  请设置开发人员角色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_developer_allow_net 
-				sed -i -e "s/^developer_allowed_access_net=.*/developer_allowed_access_net=$client_role_developer_allow_net/g" $0
+		1)
+			read -p "  请设置开发人员角色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_developer_allow_net
+			sed -i -e "s/^developer_allowed_access_net=.*/developer_allowed_access_net=$client_role_developer_allow_net/g" $0
 			;;
-			2)
-				read -p "  请设置测试人员角色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_tester_allow_net 
-				sed -i -e "s/^tester_allowed_access_net=.*/tester_allowed_access_net=$client_role_developer_allow_net/g" $0
+		2)
+			read -p "  请设置测试人员角色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_tester_allow_net
+			sed -i -e "s/^tester_allowed_access_net=.*/tester_allowed_access_net=$client_role_developer_allow_net/g" $0
 			;;
-			3)
-				read -p "  请设置运维人员角色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_manager_allow_net 
-				sed -i -e "s/^manager_allowed_access_net=.*/manager_allowed_access_net=$client_role_developer_allow_net/g" $0
+		3)
+			read -p "  请设置运维人员角色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_manager_allow_net
+			sed -i -e "s/^manager_allowed_access_net=.*/manager_allowed_access_net=$client_role_developer_allow_net/g" $0
 			;;
-			4)
-				read -p "  请设置业务人员角色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_bussiness_allow_net 
-				sed -i -e "s/^bussiness_allowed_access_net=.*/bussiness_allowed_access_net=$client_role_developer_allow_net/g" $0
+		4)
+			read -p "  请设置业务人员角色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_bussiness_allow_net
+			sed -i -e "s/^bussiness_allowed_access_net=.*/bussiness_allowed_access_net=$client_role_developer_allow_net/g" $0
 			;;
-			5)
-				read -p "  请设置机器人 角 色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_robots_allow_net 
-				sed -i -e "s/^robots_allowed_access_net=.*/robots_allowed_access_net=$client_role_developer_allow_net/g" $0
+		5)
+			read -p "  请设置机器人 角 色允许访问的内网网段或特定IP地址(多个网段或IP地址以逗号分割)：" client_role_robots_allow_net
+			sed -i -e "s/^robots_allowed_access_net=.*/robots_allowed_access_net=$client_role_developer_allow_net/g" $0
 			;;
-		esac	
+		esac
 	done
-	
 
 	echo
 
@@ -727,18 +738,18 @@ if [[ ! -e $INSTALL_DIR/server/server.conf ]]; then
 	mkdir -p $INSTALL_DIR/server/{easy-rsa,ccd,logs,ip-pools,pki} $INSTALL_DIR/client/profiles
 	easy_rsa_url='https://github.com/OpenVPN/easy-rsa/releases/download/v3.0.7/EasyRSA-3.0.7.tgz'
 	echo "  正在下载easy-rsa证书工具"
-    wget --tries=5 --continue --timeout=10 --show-progress --progress=dot -q $easy_rsa_url -O - | tar -xzf - -C /etc/openvpn/server/easy-rsa --strip-components 1 --exclude doc
-	if [[ $? == 0 && -f $INSTALL_DIR/server/easy-rsa/easyrsa ]] ;then
+	wget --tries=5 --continue --timeout=10 --show-progress --progress=dot -q $easy_rsa_url -O - | tar -xzf - -C /etc/openvpn/server/easy-rsa --strip-components 1 --exclude doc
+	if [[ $? == 0 && -f $INSTALL_DIR/server/easy-rsa/easyrsa ]]; then
 		chown -R root:root $INSTALL_DIR/server
 		# 创建CA和客户端证书
 		cd $INSTALL_DIR/server/easy-rsa/
-		echo 
+		echo
 		echo "  正在创建CA和客户端证书"
 		./easyrsa init-pki >/dev/null 2>&1
-		./easyrsa --batch build-ca nopass >/dev/null 2>&1
-		EASYRSA_CERT_EXPIRE=3650 ./easyrsa build-server-full server nopass >/dev/null 2>&1
+		EASYRSA_CA_EXPIRE=36500 ./easyrsa --batch build-ca nopass >/dev/null 2>&1
+		EASYRSA_CERT_EXPIRE=36500 ./easyrsa build-server-full server nopass >/dev/null 2>&1
 		# EASYRSA_CERT_EXPIRE=3650 ./easyrsa build-client-full "$client" nopass
-		EASYRSA_CRL_DAYS=3650 ./easyrsa gen-crl >/dev/null 2>&1
+		EASYRSA_CRL_DAYS=36500 ./easyrsa gen-crl >/dev/null 2>&1
 		# Move the stuff we need
 		cp pki/ca.crt pki/private/ca.key pki/issued/server.crt pki/private/server.key pki/crl.pem $INSTALL_DIR/server/pki
 		# CRL is read with each client connection, while OpenVPN is dropped to nobody
@@ -776,7 +787,7 @@ ssbzSibBsu/6iGtCOGEoXJf//////////wIBAg==
 		fi
 	fi
 	echo "  正在检查防火墙软件，当前操作系统的防护墙为: $firewall"
-	
+
 	# If running inside a container, disable LimitNPROC to prevent conflicts
 	if systemd-detect-virt -cq; then
 		mkdir /etc/systemd/system/openvpn-server@server.service.d/ 2>/dev/nul
@@ -788,21 +799,21 @@ LimitNPROC=infinity" >/etc/systemd/system/openvpn-server@server.service.d/disabl
 		echo "  开启防火墙"
 		systemctl enable --now firewalld.service >/dev/null 2>&1
 	fi
-		
+
 	if [[ ! -z "$server_subnet_developer_ip_pool" ]]; then
-		seq -f "${server_subnet_developer_ip_pool%.*}.%g" 2 254 > $INSTALL_DIR/server/ip-pools/developer-ip-pools
+		seq -f "${server_subnet_developer_ip_pool%.*}.%g" 2 254 >$INSTALL_DIR/server/ip-pools/developer-ip-pools
 	fi
 	if [[ ! -z "$server_subnet_tester_ip_pool" ]]; then
-		seq -f "${server_subnet_tester_ip_pool%.*}.%g" 2 254 > $INSTALL_DIR/server/ip-pools/tester-ip-pools
+		seq -f "${server_subnet_tester_ip_pool%.*}.%g" 2 254 >$INSTALL_DIR/server/ip-pools/tester-ip-pools
 	fi
-	if  [[ ! -z "$server_subnet_manager_ip_pool" ]]; then
-		seq -f "${server_subnet_manager_ip_pool%.*}.%g" 2 254 > $INSTALL_DIR/server/ip-pools/manager-ip-pools
+	if [[ ! -z "$server_subnet_manager_ip_pool" ]]; then
+		seq -f "${server_subnet_manager_ip_pool%.*}.%g" 2 254 >$INSTALL_DIR/server/ip-pools/manager-ip-pools
 	fi
-	if  [[ ! -z "$server_subnet_bussiness_ip_pool" ]]; then
-		seq -f "${server_subnet_bussiness_ip_pool%.*}.%g" 2 254 > $INSTALL_DIR/server/ip-pools/bussiness-ip-pools
+	if [[ ! -z "$server_subnet_bussiness_ip_pool" ]]; then
+		seq -f "${server_subnet_bussiness_ip_pool%.*}.%g" 2 254 >$INSTALL_DIR/server/ip-pools/bussiness-ip-pools
 	fi
-	if  [[ ! -z "$server_subnet_robots_ip_pool" ]]; then
-		seq -f "${server_subnet_robots_ip_pool%.*}.%g" 2 254 > $INSTALL_DIR/server/ip-pools/robots-ip-pools
+	if [[ ! -z "$server_subnet_robots_ip_pool" ]]; then
+		seq -f "${server_subnet_robots_ip_pool%.*}.%g" 2 254 >$INSTALL_DIR/server/ip-pools/robots-ip-pools
 	fi
 
 	# 生成OpenVPN服务端配置文件
@@ -963,7 +974,7 @@ client-disconnect openvpn-utils.sh" >>$INSTALL_DIR/server/server.conf
 			iptables_path=$(command -v iptables-legacy)
 			ip6tables_path=$(command -v ip6tables-legacy)
 		fi
-		
+
 		echo "  正在生成OpenVPN的iptables规则"
 		echo "[Unit]
 Before=network.target
@@ -982,7 +993,7 @@ WantedBy=multi-user.target
 		" >>/etc/systemd/system/openvpn-iptables.service
 		systemctl enable --now openvpn-iptables.service >/dev/null 2>&1
 
-		if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $server_subnet_developer_ip_pool ]] ;then
+		if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $server_subnet_developer_ip_pool ]]; then
 			echo "[Unit]
 Before=network.target
 
@@ -992,7 +1003,7 @@ ExecStart=$iptables_path  -I FORWARD -s $server_subnet_developer_ip_pool/24 -j A
 ExecStop=$iptables_path -D FORWARD -s $server_subnet_developer_ip_pool/24 -j ACCEPT
 # ============================开发人员放行网段============================" >>/etc/systemd/system/openvpn-iptables-developer.service
 			if [[ ! -z $client_role_developer_allow_net ]]; then
-				for i in ${client_role_developer_allow_net//,/ };do
+				for i in ${client_role_developer_allow_net//,/ }; do
 					echo -e "ExecStart=$iptables_path -t nat -I POSTROUTING -s $server_subnet_developer_ip_pool/24 -d $i -j SNAT --to $ip\nExecStop=$iptables_path -t nat -D POSTROUTING -s $server_subnet_developer_ip_pool/24 -d $i -j SNAT --to $ip\n" >>/etc/systemd/system/openvpn-iptables-developer.service
 				done
 			fi
@@ -1000,7 +1011,7 @@ ExecStop=$iptables_path -D FORWARD -s $server_subnet_developer_ip_pool/24 -j ACC
 			systemctl enable --now openvpn-iptables-developer.service >/dev/null 2>&1
 		fi
 
-		if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $server_subnet_tester_ip_pool ]] ;then
+		if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $server_subnet_tester_ip_pool ]]; then
 			echo "[Unit]
 Before=network.target
 
@@ -1010,7 +1021,7 @@ ExecStart=$iptables_path  -I FORWARD -s $server_subnet_tester_ip_pool/24 -j ACCE
 ExecStop=$iptables_path -D FORWARD -s $server_subnet_tester_ip_pool/24 -j ACCEPT
 # ============================测试人员放行网段============================" >>/etc/systemd/system/openvpn-iptables-tester.service
 			if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $client_role_tester_allow_net ]]; then
-				for i in ${client_role_tester_allow_net//,/ };do
+				for i in ${client_role_tester_allow_net//,/ }; do
 					echo -e "ExecStart=$iptables_path -t nat -I POSTROUTING -s $server_subnet_tester_ip_pool/24 -d $i -j SNAT --to $ip\nExecStop=$iptables_path -t nat -D POSTROUTING -s $server_subnet_tester_ip_pool/24 -d $i -j SNAT --to $ip\n" >>/etc/systemd/system/openvpn-iptables-tester.service
 				done
 			fi
@@ -1018,7 +1029,7 @@ ExecStop=$iptables_path -D FORWARD -s $server_subnet_tester_ip_pool/24 -j ACCEPT
 			systemctl enable --now openvpn-iptables-tester.service >/dev/null 2>&1
 		fi
 
-		if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $server_subnet_manager_ip_pool ]] ;then
+		if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $server_subnet_manager_ip_pool ]]; then
 			echo "[Unit]
 Before=network.target
 
@@ -1027,8 +1038,8 @@ Type=oneshot
 ExecStart=$iptables_path  -I FORWARD -s $server_subnet_manager_ip_pool/24 -j ACCEPT
 ExecStop=$iptables_path -D FORWARD -s $server_subnet_manager_ip_pool/24 -j ACCEPT
 # ============================运维人员放行网段============================" >>/etc/systemd/system/openvpn-iptables-manager.service
-			if [[ "$setup_client_conn_server_net" =~ ^[yY]$ &&  ! -z $client_role_manager_allow_net ]]; then
-				for i in ${client_role_manager_allow_net//,/ };do
+			if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $client_role_manager_allow_net ]]; then
+				for i in ${client_role_manager_allow_net//,/ }; do
 					echo -e "ExecStart=$iptables_path -t nat -I POSTROUTING -s $server_subnet_manager_ip_pool/24 -d $i -j SNAT --to $ip\nExecStop=$iptables_path -t nat -D POSTROUTING -s $server_subnet_manager_ip_pool/24 -d $i -j SNAT --to $ip\n" >>/etc/systemd/system/openvpn-iptables-manager.service
 				done
 			fi
@@ -1036,7 +1047,7 @@ ExecStop=$iptables_path -D FORWARD -s $server_subnet_manager_ip_pool/24 -j ACCEP
 			systemctl enable --now openvpn-iptables-manager.service >/dev/null 2>&1
 		fi
 
-		if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $server_subnet_bussiness_ip_pool ]] ;then
+		if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $server_subnet_bussiness_ip_pool ]]; then
 			echo "[Unit]
 Before=network.target
 
@@ -1046,14 +1057,14 @@ ExecStart=$iptables_path  -I FORWARD -s $server_subnet_bussiness_ip_pool/24 -j A
 ExecStop=$iptables_path -D FORWARD -s $server_subnet_bussiness_ip_pool/24 -j ACCEPT
 # ============================业务人员放行网段============================" >>/etc/systemd/system/openvpn-iptables-bussiness.service
 			if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $client_role_bussiness_allow_net ]]; then
-				for i in ${client_role_bussiness_allow_net//,/ };do
+				for i in ${client_role_bussiness_allow_net//,/ }; do
 					echo -e "ExecStart=$iptables_path -t nat -I POSTROUTING -s $server_subnet_bussiness_ip_pool/24 -d $i -j SNAT --to $ip\nExecStop=$iptables_path -t nat -D POSTROUTING -s $server_subnet_bussiness_ip_pool/24 -d $i -j SNAT --to $ip\n" >>/etc/systemd/system/openvpn-iptables-bussiness.service
 				done
 			fi
 			echo -e "RemainAfterExit=yes\n[Install]\nWantedBy=multi-user.target" >>/etc/systemd/system/openvpn-iptables-bussiness.service
 			systemctl enable --now openvpn-iptables-bussiness.service >/dev/null 2>&1
 		fi
-		if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $server_subnet_robots_ip_pool ]] ;then
+		if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $server_subnet_robots_ip_pool ]]; then
 			echo "[Unit]
 Before=network.target
 
@@ -1064,7 +1075,7 @@ ExecStop=$iptables_path -D FORWARD -s $server_subnet_robots_ip_pool/24 -j ACCEPT
 # ============================机器人放行网段============================" >>/etc/systemd/system/openvpn-iptables-robots.service
 
 			if [[ "$setup_client_conn_server_net" =~ ^[yY]$ && ! -z $client_role_robots_allow_net ]]; then
-				for i in ${client_role_robots_allow_net//,/ };do
+				for i in ${client_role_robots_allow_net//,/ }; do
 					echo -e "ExecStart=$iptables_path -t nat -I POSTROUTING -s $server_subnet_robots_ip_pool/24 -d $i -j SNAT --to $ip\nExecStop=$iptables_path -t nat -D POSTROUTING -s $server_subnet_robots_ip_pool/24 -d $i -j SNAT --to $ip\n" >>/etc/systemd/system/openvpn-iptables-robots.service
 				done
 			fi
@@ -1140,47 +1151,58 @@ else
 			read -p "$client已存在或不符合规则，请设置新的用户名: " client
 		done
 
-		if [[ ! -z $setup_subnet_roles_nu ]] ;then
+		if [[ ! -z $setup_subnet_roles_nu ]]; then
 			echo "已配置的用户角色："
 			display_nu=1
-			for i in ${setup_subnet_roles_nu//,/ };do
+			for i in ${setup_subnet_roles_nu//,/ }; do
 				case $i in
-					1)
-						echo "  ${display_nu}: 开发人员角色，允许访问的网段或IP：$developer_allowed_access_net"
-						display_nu=$((display_nu+1))
+				1)
+					echo "  ${display_nu}: 开发人员角色，允许访问的网段或IP：$developer_allowed_access_net"
+					display_nu=$((display_nu + 1))
 					;;
-					2)
-						echo "  ${display_nu}: 测试人员角色，允许访问的网段或IP：$tester_allowed_access_net"
-						display_nu=$((display_nu+1))
+				2)
+					echo "  ${display_nu}: 测试人员角色，允许访问的网段或IP：$tester_allowed_access_net"
+					display_nu=$((display_nu + 1))
 					;;
-					3)
-						echo "  ${display_nu}: 运维人员角色，允许访问的网段或IP：$manager_allowed_access_net"
-						display_nu=$((display_nu+1))
+				3)
+					echo "  ${display_nu}: 运维人员角色，允许访问的网段或IP：$manager_allowed_access_net"
+					display_nu=$((display_nu + 1))
 					;;
-					4)
-						echo "  ${display_nu}: 业务人员角色，允许访问的网段或IP：$bussiness_allowed_access_net"
-						display_nu=$((display_nu+1))
+				4)
+					echo "  ${display_nu}: 业务人员角色，允许访问的网段或IP：$bussiness_allowed_access_net"
+					display_nu=$((display_nu + 1))
 					;;
-					5)
-						echo "  ${display_nu}: 机器人 角 色，允许访问的网段或IP：$robots_allowed_access_net"
-						display_nu=$((display_nu+1))
+				5)
+					echo "  ${display_nu}: 机器人 角 色，允许访问的网段或IP：$robots_allowed_access_net"
+					display_nu=$((display_nu + 1))
 					;;
 				esac
 			done
 		fi
 
-		read -p "请设置新用户角色: " new_client_role
+		read -p "请设置新用户角色(单选): " new_client_role
 		until [[ -z "$new_client_role" || "$new_client_role" =~ ^[1|2|3|4|5]$ ]]; do
 			echo "$new_client_role: 无效的选项."
 			read -p "请重新设置新用户角色" new_client_role
 		done
 
-		read -p "设置用户邮箱: " user_email_address 
+		read -p "设置用户邮箱: " user_email_address
 		until [[ -z ${user_email_address+x} || ${user_email_address} =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$ ]]; do
 			read -p "${user_email_address}不是一个正确的邮箱格式，请重新设置: " user_email_address
 		done
+		for i in ${setup_subnet_roles//,/ }; do
+			case $new_client_role in
+			1) ;;
+
+			2) ;;
+
+			3) ;;
+
+			esac
+		done
 		tmp_var=${new_client_role}_allowed_access_net
-		new_client $client $new_client_role $user_email_address ${!tmp_var}
+
+		new_client $client $new_client_role $user_email_address ${tmp_var}
 		exit
 		;;
 	2)
@@ -1192,7 +1214,7 @@ else
 			echo
 			echo "暂时没有已存在的客户端用户"
 			exit
-		fi		
+		fi
 		echo
 		echo "请选择要删除的客户端用户:"
 		tail -n +2 $INSTALL_DIR/server/easy-rsa/pki/index.txt | grep "^V" | cut -d '=' -f 2 | nl -s ') '
@@ -1208,7 +1230,7 @@ else
 			echo "$revoke_client_option: 无效的选项."
 			read -p "请确认是否要删除客户端用户$release_client_username [Y/n]: " revoke_client_option
 		done
-		
+
 		if [[ "$revoke_client_option" =~ ^[Y]$ && -f $INSTALL_DIR/server/ccd/$release_client_username ]]; then
 			cd $INSTALL_DIR/server/easy-rsa
 			./easyrsa --batch revoke "$release_client_username" >/dev/null 2>&1
@@ -1218,10 +1240,10 @@ else
 			# CRL is read with each client connection, when OpenVPN is dropped to nobody
 			# chown nobody:"$group_name" $INSTALL_DIR/server/crl.pem
 			client_ip_ready_release=$(grep "ifconfig-push" $INSTALL_DIR/server/ccd/$release_client_username | awk '{print $2}')
-			release_client_role=$(grep -w "$release_client_username" /etc/openvpn/server/clients-info |awk -F" " '{print $1}')
+			release_client_role=$(grep -w "$release_client_username" /etc/openvpn/server/clients-info | awk -F" " '{print $1}')
 			sed -i "/$release_client_username/d" $INSTALL_DIR/server/clients-info
 			sed -i "/\<$release_client_username\>/d" $INSTALL_DIR/server/psw-file
-			echo "$client_ip_ready_release" >> $INSTALL_DIR/server/ip-pools/$release_client_role-ip-pools
+			echo "$client_ip_ready_release" >>$INSTALL_DIR/server/ip-pools/$release_client_role-ip-pools
 			rm -f $INSTALL_DIR/server/ccd/$release_client_username $INSTALL_DIR/client/profiles/$release_client_username.ovpn
 			echo "用户$release_client_username已删除!"
 		else
@@ -1256,48 +1278,48 @@ else
 				# 	firewall-cmd --permanent --direct --remove-rule ipv6 nat POSTROUTING 0 -s fddd:1194:1194:1194::/64 ! -d fddd:1194:1194:1194::/64 -j SNAT --to "$ip6"
 				# fi
 			else
-				
+
 				systemctl disable --now openvpn-iptables.service >/dev/null 2>&1
-				
+
 			fi
 			if sestatus 2>/dev/null | grep "Current mode" | grep -q "enforcing" && [[ "$port" != 1194 ]]; then
 				semanage port -d -t openvpn_port_t -p "$protocol" "$port"
 			fi
 
-			if [[ ! -z $setup_subnet_roles_nu ]];then
-				for i in ${setup_subnet_roles_nu//,/ };do
+			if [[ ! -z $setup_subnet_roles_nu ]]; then
+				for i in ${setup_subnet_roles_nu//,/ }; do
 					case $i in
-						1)
-							systemctl disable --now openvpn-iptables-developer.service >/dev/null 2>&1
-							systemctl stop --now openvpn-iptables-developer.service >/dev/null 2>&1
+					1)
+						systemctl disable --now openvpn-iptables-developer.service >/dev/null 2>&1
+						systemctl stop --now openvpn-iptables-developer.service >/dev/null 2>&1
 						;;
-						2)
-							systemctl disable --now openvpn-iptables-tester.service >/dev/null 2>&1
-							systemctl stop --now openvpn-iptables-tester.service >/dev/null 2>&1
+					2)
+						systemctl disable --now openvpn-iptables-tester.service >/dev/null 2>&1
+						systemctl stop --now openvpn-iptables-tester.service >/dev/null 2>&1
 						;;
-						3)
-							systemctl disable --now openvpn-iptables-manager.service >/dev/null 2>&1
-							systemctl stop --now openvpn-iptables-manager.service >/dev/null 2>&1
+					3)
+						systemctl disable --now openvpn-iptables-manager.service >/dev/null 2>&1
+						systemctl stop --now openvpn-iptables-manager.service >/dev/null 2>&1
 						;;
-						4)
-							systemctl disable --now openvpn-iptables-bussiness.service >/dev/null 2>&1
-							systemctl stop --now openvpn-iptables-bussiness.service >/dev/null 2>&1
+					4)
+						systemctl disable --now openvpn-iptables-bussiness.service >/dev/null 2>&1
+						systemctl stop --now openvpn-iptables-bussiness.service >/dev/null 2>&1
 						;;
-						5)
-							systemctl disable --now openvpn-iptables-robots.service >/dev/null 2>&1
-							systemctl stop --now openvpn-iptables-robots.service >/dev/null 2>&1
+					5)
+						systemctl disable --now openvpn-iptables-robots.service >/dev/null 2>&1
+						systemctl stop --now openvpn-iptables-robots.service >/dev/null 2>&1
 						;;
 					esac
 				done
 			fi
-			
+
 			systemctl disable --now openvpn-server@server.service >/dev/null 2>&1
 			sed -i -e 's/^setup_subnet_roles_nu=.*/setup_subnet_roles_nu=/g' \
-			       -e 's/^developer_allowed_access_net=.*/developer_allowed_access_net=/g' \
-			       -e 's/^tester_allowed_access_net=.*/tester_allowed_access_net=/g' \
-			       -e 's/^manager_allowed_access_net=.*/manager_allowed_access_net=/g' \
-			       -e 's/^bussiness_allowed_access_net=.*/bussiness_allowed_access_net=/g' \
-			       -e 's/^robots_allowed_access_net=.*/robots_allowed_access_net=/g' $0
+				-e 's/^developer_allowed_access_net=.*/developer_allowed_access_net=/g' \
+				-e 's/^tester_allowed_access_net=.*/tester_allowed_access_net=/g' \
+				-e 's/^manager_allowed_access_net=.*/manager_allowed_access_net=/g' \
+				-e 's/^bussiness_allowed_access_net=.*/bussiness_allowed_access_net=/g' \
+				-e 's/^robots_allowed_access_net=.*/robots_allowed_access_net=/g' $0
 			cp /etc/systemd/system/openvpn-iptables*.service /etc/openvpn
 			mv /usr/local/bin/ovpnx /etc/openvpn
 			backupdate=$(date "+%Y%m%d%M")
